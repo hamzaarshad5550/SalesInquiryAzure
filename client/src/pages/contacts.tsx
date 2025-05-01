@@ -16,11 +16,12 @@ import { Link } from "wouter";
 import { Plus, Search, Mail, Phone, MoreHorizontal } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { type Contact } from "@shared/schema";
 
 export default function Contacts() {
   const [searchQuery, setSearchQuery] = useState("");
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<{ contacts: Contact[] }>({
     queryKey: ['/api/contacts', { search: searchQuery }],
   });
 
@@ -44,8 +45,10 @@ export default function Contacts() {
               />
             </div>
             
-            <Button>
-              <Plus className="mr-2 h-4 w-4" /> Add Contact
+            <Button asChild>
+              <Link href="/contacts/new">
+                <Plus className="mr-2 h-4 w-4" /> Add Contact
+              </Link>
             </Button>
           </div>
         </div>

@@ -7,6 +7,8 @@ import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import Pipeline from "@/pages/pipeline";
 import Contacts from "@/pages/contacts";
+import ContactForm from "@/pages/contact-form";
+import ContactDetail from "@/pages/contact-detail";
 import { Sidebar } from "@/components/layout/sidebar";
 import { TopBar } from "@/components/layout/top-bar";
 import { useState } from "react";
@@ -42,6 +44,8 @@ function Router() {
           <Route path="/" component={Dashboard} />
           <Route path="/pipeline" component={Pipeline} />
           <Route path="/contacts" component={Contacts} />
+          <Route path="/contacts/new" component={ContactForm} />
+          <Route path="/contacts/:id" component={ContactDetail} />
           <Route component={NotFound} />
         </Switch>
       </div>

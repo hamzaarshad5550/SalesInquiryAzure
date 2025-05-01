@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { type Contact } from "@shared/schema";
 
 import {
   Form,
@@ -78,7 +79,7 @@ export default function ContactDetail() {
 
   const contactId = params?.id;
 
-  const { data: contact, isLoading } = useQuery({
+  const { data: contact, isLoading } = useQuery<Contact>({
     queryKey: [`/api/contacts/${contactId}`],
     enabled: !!contactId,
   });
@@ -100,7 +101,7 @@ export default function ContactDetail() {
   });
 
   // When contact data is loaded, populate the form
-  useState(() => {
+  useEffect(() => {
     if (contact) {
       form.reset({
         name: contact.name,
@@ -115,7 +116,7 @@ export default function ContactDetail() {
         assignedTo: contact.assignedTo || 1,
       });
     }
-  });
+  }, [contact, form]);
 
   const updateContactMutation = useMutation({
     mutationFn: (data: ContactFormValues) => {
@@ -215,7 +216,7 @@ export default function ContactDetail() {
 
   const initials = contact.name
     .split(" ")
-    .map((n) => n[0])
+    .map((n: string) => n[0])
     .join("")
     .toUpperCase();
 
