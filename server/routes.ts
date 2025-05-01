@@ -8,7 +8,7 @@ import {
   teams,
   contacts,
   deals,
-  tasks,
+  tasks as tasksTable,
   activities,
   pipelineStages,
   insertContactSchema,
@@ -16,6 +16,7 @@ import {
   insertTaskSchema,
   insertActivitySchema,
 } from "@shared/schema";
+import { db } from "@db";
 import { ZodError } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -41,6 +42,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching teams:", error);
       res.status(500).json({ message: "Failed to fetch teams" });
+    }
+  });
+  
+  // Get all users
+  app.get(`${apiPrefix}/users`, async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      res.json({ users });
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
     }
   });
 
@@ -116,6 +128,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error toggling task completion:", error);
       res.status(500).json({ message: "Failed to toggle task completion" });
+    }
+  });
+  
+  // Get all tasks
+  app.get(`${apiPrefix}/tasks`, async (req, res) => {
+    try {
+      const search = req.query.search as string | undefined;
+      // Implement a search function in storage later
+      const tasksList = await db.select().from(tasksTable);
+      res.json({ tasks: tasksList });
+    } catch (error) {
+      console.error("Error fetching tasks:", error);
+      res.status(500).json({ message: "Failed to fetch tasks" });
+    }
+  });
+  
+  // Get a single task
+  app.get(`${apiPrefix}/tasks/:taskId`, async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.taskId);
+      const task = await db.query.tasks.findFirst({
+        where: eq(tasks.id, taskId)
+      });
+      
+      if (!task) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+      
+      res.json(task);
+    } catch (error) {
+      console.error("Error fetching task:", error);
+      res.status(500).json({ message: "Failed to fetch task" });
+    }
+  });
+  
+  // Update task
+  app.patch(`${apiPrefix}/tasks/:taskId`, async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.taskId);
+      const taskData = insertTaskSchema.partial().parse(req.body);
+      
+      const [updatedTask] = await db.update(tasks)
+        .set(taskData)
+        .where(eq(tasks.id, taskId))
+        .returning();
+      
+      if (!updatedTask) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+      
+      res.json(updatedTask);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        res.status(400).json({ message: "Invalid task data", errors: error.errors });
+      } else {
+        console.error("Error updating task:", error);
+        res.status(500).json({ message: "Failed to update task" });
+      }
+    }
+  });
+  
+  // Delete task
+  app.delete(`${apiPrefix}/tasks/:taskId`, async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.taskId);
+      
+      const [deletedTask] = await db.delete(tasks)
+        .where(eq(tasks.id, taskId))
+        .returning();
+      
+      if (!deletedTask) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+      
+      res.status(204).end();
+    } catch (error) {
+      console.error("Error deleting task:", error);
+      res.status(500).json({ message: "Failed to delete task" });
     }
   });
 
