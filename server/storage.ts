@@ -575,6 +575,17 @@ export const storage = {
   },
 
   /**
+   * Gets a single contact by ID
+   */
+  async getContactById(contactId: number) {
+    const contact = await db.query.contacts.findFirst({
+      where: eq(contacts.id, contactId)
+    });
+    
+    return contact;
+  },
+
+  /**
    * Creates a new contact
    */
   async createContact(contactData: InsertContact) {
@@ -588,6 +599,53 @@ export const storage = {
       .returning();
     
     return newContact[0];
+  },
+  
+  /**
+   * Updates an existing contact
+   */
+  async updateContact(contactId: number, contactData: Partial<InsertContact>) {
+    // First check if contact exists
+    const existingContact = await db.query.contacts.findFirst({
+      where: eq(contacts.id, contactId)
+    });
+    
+    if (!existingContact) {
+      return null;
+    }
+    
+    // Update the contact
+    const updatedContact = await db
+      .update(contacts)
+      .set({ 
+        ...contactData,
+        updatedAt: new Date()
+      })
+      .where(eq(contacts.id, contactId))
+      .returning();
+    
+    return updatedContact[0];
+  },
+  
+  /**
+   * Deletes a contact
+   */
+  async deleteContact(contactId: number) {
+    // First check if contact exists
+    const existingContact = await db.query.contacts.findFirst({
+      where: eq(contacts.id, contactId)
+    });
+    
+    if (!existingContact) {
+      return false;
+    }
+    
+    // Delete the contact
+    await db
+      .delete(contacts)
+      .where(eq(contacts.id, contactId));
+    
+    return true;
   },
 
   /**

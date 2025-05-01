@@ -169,6 +169,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get single contact
+  app.get(`${apiPrefix}/contacts/:contactId`, async (req, res) => {
+    try {
+      const contactId = parseInt(req.params.contactId);
+      const contact = await storage.getContactById(contactId);
+      
+      if (!contact) {
+        return res.status(404).json({ message: "Contact not found" });
+      }
+      
+      res.json(contact);
+    } catch (error) {
+      console.error("Error getting contact:", error);
+      res.status(500).json({ message: "Failed to get contact" });
+    }
+  });
+
+  // Update contact
+  app.patch(`${apiPrefix}/contacts/:contactId`, async (req, res) => {
+    try {
+      const contactId = parseInt(req.params.contactId);
+      const contactData = insertContactSchema.partial().parse(req.body);
+      const updatedContact = await storage.updateContact(contactId, contactData);
+      
+      if (!updatedContact) {
+        return res.status(404).json({ message: "Contact not found" });
+      }
+      
+      res.json(updatedContact);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        res.status(400).json({ message: "Invalid contact data", errors: error.errors });
+      } else {
+        console.error("Error updating contact:", error);
+        res.status(500).json({ message: "Failed to update contact" });
+      }
+    }
+  });
+
+  // Delete contact
+  app.delete(`${apiPrefix}/contacts/:contactId`, async (req, res) => {
+    try {
+      const contactId = parseInt(req.params.contactId);
+      const success = await storage.deleteContact(contactId);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Contact not found" });
+      }
+      
+      res.status(204).end();
+    } catch (error) {
+      console.error("Error deleting contact:", error);
+      res.status(500).json({ message: "Failed to delete contact" });
+    }
+  });
+
   // Create new deal
   app.post(`${apiPrefix}/deals`, async (req, res) => {
     try {
