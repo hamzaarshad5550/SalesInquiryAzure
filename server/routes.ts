@@ -149,7 +149,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const taskId = parseInt(req.params.taskId);
       const task = await db.query.tasks.findFirst({
-        where: eq(tasks.id, taskId)
+        where: eq(tasksTable.id, taskId)
       });
       
       if (!task) {
