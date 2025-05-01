@@ -169,9 +169,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const taskId = parseInt(req.params.taskId);
       const taskData = insertTaskSchema.partial().parse(req.body);
       
-      const [updatedTask] = await db.update(tasks)
+      const [updatedTask] = await db.update(tasksTable)
         .set(taskData)
-        .where(eq(tasks.id, taskId))
+        .where(eq(tasksTable.id, taskId))
         .returning();
       
       if (!updatedTask) {
@@ -194,8 +194,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const taskId = parseInt(req.params.taskId);
       
-      const [deletedTask] = await db.delete(tasks)
-        .where(eq(tasks.id, taskId))
+      const [deletedTask] = await db.delete(tasksTable)
+        .where(eq(tasksTable.id, taskId))
         .returning();
       
       if (!deletedTask) {
