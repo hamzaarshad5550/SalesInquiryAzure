@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { type Contact } from "@shared/schema";
+import { type Contact, type Activity, type Task, type InsertActivity, type InsertTask, type InsertDeal } from "@shared/schema";
 
 import {
   Form,
@@ -30,6 +30,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   ArrowLeft,
   Save,
   Trash2,
@@ -39,7 +47,11 @@ import {
   MapPin,
   Briefcase,
   Users,
-  AlertCircle
+  AlertCircle,
+  MessageSquare,
+  RefreshCw,
+  Calendar,
+  Clock
 } from "lucide-react";
 import {
   AlertDialog,
@@ -69,21 +81,99 @@ const contactFormSchema = z.object({
 
 type ContactFormValues = z.infer<typeof contactFormSchema>;
 
+// Activity form schema
+const activityFormSchema = z.object({
+  type: z.enum(["call", "email", "meeting", "note", "update"], {
+    required_error: "Please select an activity type",
+  }),
+  title: z.string().min(2, "Title must be at least 2 characters"),
+  description: z.string().optional(),
+});
+
+type ActivityFormValues = z.infer<typeof activityFormSchema>;
+
+// Task form schema
+const taskFormSchema = z.object({
+  title: z.string().min(2, "Title must be at least 2 characters"),
+  description: z.string().optional(),
+  dueDate: z.string().optional(),
+  time: z.string().optional(),
+  priority: z.enum(["high", "medium", "low"], {
+    required_error: "Please select a priority level",
+  }),
+  assignedTo: z.coerce.number(),
+});
+
+type TaskFormValues = z.infer<typeof taskFormSchema>;
+
+// Deal form schema
+const dealFormSchema = z.object({
+  name: z.string().min(2, "Deal name must be at least 2 characters"),
+  description: z.string().optional(),
+  value: z.coerce.number().positive("Value must be positive"),
+  stageId: z.coerce.number({
+    required_error: "Please select a pipeline stage",
+  }),
+  expectedCloseDate: z.string().optional(),
+  probability: z.coerce.number().min(0).max(100).default(50),
+});
+
+type DealFormValues = z.infer<typeof dealFormSchema>;
+
 export default function ContactDetail() {
   const [match, params] = useRoute("/contacts/:id");
   const [_, navigate] = useLocation();
   const [isEditing, setIsEditing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isActivityDialogOpen, setIsActivityDialogOpen] = useState(false);
+  const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
+  const [isDealDialogOpen, setIsDealDialogOpen] = useState(false);
+  const [selectedActivityType, setSelectedActivityType] = useState<string>("call");
+  const [isSubmittingActivity, setIsSubmittingActivity] = useState(false);
+  const [isSubmittingTask, setIsSubmittingTask] = useState(false);
+  const [isSubmittingDeal, setIsSubmittingDeal] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const contactId = params?.id;
 
+  // Get contact data
   const { data: contact, isLoading } = useQuery<Contact>({
     queryKey: [`/api/contacts/${contactId}`],
     enabled: !!contactId,
   });
 
+  // Get activities data for this contact
+  const { data: activitiesData } = useQuery<{ activities: Activity[] }>({
+    queryKey: [`/api/contacts/${contactId}/activities`],
+    enabled: !!contactId,
+  });
+
+  // Get tasks data for this contact
+  const { data: tasksData } = useQuery<{ tasks: Task[] }>({
+    queryKey: [`/api/contacts/${contactId}/tasks`],
+    enabled: !!contactId,
+  });
+
+  // Get deals data for this contact
+  const { data: dealsData } = useQuery<{ deals: any[] }>({
+    queryKey: [`/api/contacts/${contactId}/deals`],
+    enabled: !!contactId,
+  });
+
+  // Get pipeline stages for deal creation
+  const { data: pipelineData } = useQuery<{ stages: any[] }>({
+    queryKey: ['/api/pipeline'],
+    enabled: !!contactId,
+  });
+
+  // Get all users for assignee selection
+  const { data: usersData } = useQuery<{ users: any[] }>({
+    queryKey: ['/api/users'],
+    enabled: !!contactId,
+  });
+
+  // Initialize forms
   const form = useForm<ContactFormValues>({
     resolver: zodResolver(contactFormSchema),
     defaultValues: {
@@ -97,6 +187,39 @@ export default function ContactDetail() {
       address: "",
       notes: "",
       assignedTo: 1,
+    },
+  });
+
+  const activityForm = useForm<ActivityFormValues>({
+    resolver: zodResolver(activityFormSchema),
+    defaultValues: {
+      type: "call",
+      title: "",
+      description: "",
+    },
+  });
+
+  const taskForm = useForm<TaskFormValues>({
+    resolver: zodResolver(taskFormSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+      dueDate: "",
+      time: "",
+      priority: "medium",
+      assignedTo: 1,
+    },
+  });
+
+  const dealForm = useForm<DealFormValues>({
+    resolver: zodResolver(dealFormSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      value: 0,
+      stageId: 1,
+      expectedCloseDate: "",
+      probability: 50,
     },
   });
 
@@ -567,18 +690,142 @@ export default function ContactDetail() {
 
         <TabsContent value="activities">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Activities History</CardTitle>
+              <Button
+                onClick={() => {
+                  setIsActivityDialogOpen(true);
+                  setSelectedActivityType("call");
+                }}
+              >
+                + Log Activity
+              </Button>
             </CardHeader>
             <CardContent>
-              <p className="text-center text-slate-500 py-8">No activities found for this contact.</p>
-              <div className="flex justify-center">
-                <Button>
-                  + Log Activity
-                </Button>
-              </div>
+              {activities.length > 0 ? (
+                <div className="space-y-4">
+                  {activities.map((activity) => (
+                    <div key={activity.id} className="flex items-start gap-4 p-4 border-b dark:border-gray-700">
+                      <div className={`p-2 rounded-full ${
+                        activity.type === 'call' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' :
+                        activity.type === 'email' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' :
+                        activity.type === 'meeting' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
+                        activity.type === 'note' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300' :
+                        'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
+                      }`}>
+                        {activity.type === 'call' && <Phone className="h-4 w-4" />}
+                        {activity.type === 'email' && <Mail className="h-4 w-4" />}
+                        {activity.type === 'meeting' && <Users className="h-4 w-4" />}
+                        {activity.type === 'note' && <MessageSquare className="h-4 w-4" />}
+                        {activity.type === 'update' && <RefreshCw className="h-4 w-4" />}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-medium">{activity.title}</h4>
+                          <span className="text-xs text-slate-500">
+                            {new Date(activity.createdAt).toLocaleString()}
+                          </span>
+                        </div>
+                        <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                          {activity.description}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-center text-slate-500 py-8">No activities found for this contact.</p>
+              )}
             </CardContent>
           </Card>
+
+          <Dialog open={isActivityDialogOpen} onOpenChange={setIsActivityDialogOpen}>
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle>Log New Activity</DialogTitle>
+                <DialogDescription>
+                  Record a new activity with this contact.
+                </DialogDescription>
+              </DialogHeader>
+              
+              <Form {...activityForm}>
+                <form onSubmit={activityForm.handleSubmit(onSubmitActivity)} className="space-y-4 mt-2">
+                  <FormField
+                    control={activityForm.control}
+                    name="type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Activity Type</FormLabel>
+                        <Select
+                          value={field.value}
+                          onValueChange={field.onChange}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select an activity type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="call">Phone Call</SelectItem>
+                            <SelectItem value="email">Email</SelectItem>
+                            <SelectItem value="meeting">Meeting</SelectItem>
+                            <SelectItem value="note">Note</SelectItem>
+                            <SelectItem value="update">Status Update</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={activityForm.control}
+                    name="title"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Title</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Brief summary of the activity" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={activityForm.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Detailed notes about the activity" 
+                            className="resize-none min-h-[120px]" 
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <DialogFooter className="mt-6">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsActivityDialogOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={isSubmittingActivity}>
+                      {isSubmittingActivity ? "Saving..." : "Save Activity"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         <TabsContent value="tasks">
