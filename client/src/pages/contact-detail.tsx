@@ -879,8 +879,10 @@ export default function ContactDetail() {
                             </span>
                           )}
                         </div>
-                        <span className="flex items-center hover:underline cursor-pointer" 
-                              onClick={() => navigate(`/pipeline?deal=${deal.id}`)}>
+                        <span 
+                          className="flex items-center hover:underline cursor-pointer" 
+                          onClick={() => navigate(`/pipeline?deal=${deal.id}`)}
+                        >
                           <ExternalLink className="h-3 w-3 mr-1" />
                           View in Pipeline
                         </span>
