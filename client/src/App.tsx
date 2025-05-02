@@ -9,6 +9,10 @@ import Pipeline from "@/pages/pipeline";
 import Contacts from "@/pages/contacts";
 import ContactForm from "@/pages/contact-form";
 import ContactDetail from "@/pages/contact-detail";
+import Tasks from "@/pages/tasks";
+import Messages from "@/pages/messages";
+import Analytics from "@/pages/analytics";
+import Settings from "@/pages/settings";
 import { Sidebar } from "@/components/layout/sidebar";
 import { TopBar } from "@/components/layout/top-bar";
 import { useState } from "react";
@@ -46,6 +50,7 @@ function Router() {
           <Route path="/contacts" component={Contacts} />
           <Route path="/contacts/new" component={ContactForm} />
           <Route path="/contacts/:id" component={ContactDetail} />
+          <Route path="/tasks" component={Tasks} />
           <Route component={NotFound} />
         </Switch>
       </div>

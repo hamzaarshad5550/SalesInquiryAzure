@@ -1,0 +1,39 @@
+all data stored and managed in a database. Currently, the system has critical errors—pages, buttons, and core features are broken. Fix the following issues and ensure seamless functionality:
+1. Database Integration
+All data (contacts, tasks, deals, messages, settings) must be stored, updated, and retrieved from a centralized database (e.g., PostgreSQL, Firebase, or MongoDB).
+Ensure real-time sync—any changes (add/edit/delete) reflect immediately across the app.
+2. Fix Broken Pages (404 Errors)
+Tasks Page:
+Fix loading issues; users must view, add, edit, and delete tasks.
+Ensure due dates, priorities, and assignees work.
+Messages Page:
+Restore messaging functionality (internal chat or email integration).
+Analytics Page:
+Fix dashboard errors; display real-time stats (deals won, tasks completed).
+Settings Page:
+Allow profile updates, role permissions, and system configurations.
+3. Fix Non-Working Buttons & Features
+Contacts Page:
+'Add Contact' button: Fix form submission (name, email, company) and save to DB.
+Search function: Enable filtering by name, email, or tags.
+Pipeline Page:
+'New Deal' button: Must create and save deals to the database.
+Drag-and-drop functionality: Allow moving contacts/deals between stages (Lead → Qualified → Proposal).
+Custom Pipeline Flow: Add a button to reorder stages (e.g., swap 'Qualified' and 'Lead').
+Notifications:
+Alerts for new messages, task deadlines, or deal updates.
+4. Task Management Fixes
+Users cannot add tasks → Fix form submission and DB integration.
+Task view page (404) → Rebuild with details like status, assignee, and comments.
+5. Technical Implementation
+Backend: Node.js (Express) or Python (Django) with RESTful API.
+Database: PostgreSQL (for relational data) or Firebase (for real-time updates).
+Frontend: React.js/Vue.js for dynamic UI (drag-and-drop pipelines).
+APIs:
+Use Google/OAuth2 for email sync if needed.
+WebSockets for live notifications.
+6. Expected Deliverables
+A fully functional prototype with zero 404 errors.
+All buttons, forms, and drag-and-drop features working.
+Database proof (e.g., sample data entries for contacts/tasks).
+Documentation explaining fixes and how to extend features.
