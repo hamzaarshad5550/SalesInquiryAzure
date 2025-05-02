@@ -51,6 +51,9 @@ function Router() {
           <Route path="/contacts/new" component={ContactForm} />
           <Route path="/contacts/:id" component={ContactDetail} />
           <Route path="/tasks" component={Tasks} />
+          <Route path="/messages" component={Messages} />
+          <Route path="/analytics" component={Analytics} />
+          <Route path="/settings" component={Settings} />
           <Route component={NotFound} />
         </Switch>
       </div>
