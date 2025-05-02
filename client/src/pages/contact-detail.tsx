@@ -51,7 +51,11 @@ import {
   MessageSquare,
   RefreshCw,
   Calendar,
-  Clock
+  Clock,
+  Check,
+  ArrowDown,
+  User,
+  ExternalLink
 } from "lucide-react";
 import {
   AlertDialog,
@@ -288,13 +292,157 @@ export default function ContactDetail() {
     },
   });
 
+  // Handle contact form submission
   const onSubmit = (data: ContactFormValues) => {
     setIsSubmitting(true);
     updateContactMutation.mutate(data);
   };
 
+  // Handle contact deletion
   const handleDelete = () => {
     deleteContactMutation.mutate();
+  };
+
+  // Create activity mutation
+  const createActivityMutation = useMutation({
+    mutationFn: (data: ActivityFormValues) => {
+      const activityData: Partial<InsertActivity> = {
+        ...data,
+        userId: 1, // Current user id placeholder
+        relatedToType: 'contact',
+        relatedToId: parseInt(contactId as string),
+      };
+      return apiRequest("POST", "/api/activities", activityData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/contacts/${contactId}/activities`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/activities/recent'] });
+      
+      toast({
+        title: "Activity logged successfully",
+        description: "The activity has been recorded for this contact",
+      });
+      
+      setIsActivityDialogOpen(false);
+      activityForm.reset({
+        type: "call",
+        title: "",
+        description: "",
+      });
+    },
+    onError: (error) => {
+      console.error("Error logging activity:", error);
+      toast({
+        title: "Failed to log activity",
+        description: "There was an error recording the activity. Please try again.",
+        variant: "destructive",
+      });
+    },
+    onSettled: () => {
+      setIsSubmittingActivity(false);
+    }
+  });
+
+  // Handle activity form submission
+  const onSubmitActivity = (data: ActivityFormValues) => {
+    setIsSubmittingActivity(true);
+    createActivityMutation.mutate(data);
+  };
+
+  // Create task mutation
+  const createTaskMutation = useMutation({
+    mutationFn: (data: TaskFormValues) => {
+      const taskData: Partial<InsertTask> = {
+        ...data,
+        relatedToType: 'contact',
+        relatedToId: parseInt(contactId as string),
+      };
+      return apiRequest("POST", "/api/tasks", taskData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/contacts/${contactId}/tasks`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
+      
+      toast({
+        title: "Task created successfully",
+        description: "The task has been created and assigned",
+      });
+      
+      setIsTaskDialogOpen(false);
+      taskForm.reset({
+        title: "",
+        description: "",
+        dueDate: "",
+        time: "",
+        priority: "medium",
+        assignedTo: 1,
+      });
+    },
+    onError: (error) => {
+      console.error("Error creating task:", error);
+      toast({
+        title: "Failed to create task",
+        description: "There was an error creating the task. Please try again.",
+        variant: "destructive",
+      });
+    },
+    onSettled: () => {
+      setIsSubmittingTask(false);
+    }
+  });
+
+  // Handle task form submission
+  const onSubmitTask = (data: TaskFormValues) => {
+    setIsSubmittingTask(true);
+    createTaskMutation.mutate(data);
+  };
+
+  // Create deal mutation
+  const createDealMutation = useMutation({
+    mutationFn: (data: DealFormValues) => {
+      const dealData: Partial<InsertDeal> = {
+        ...data,
+        contactId: parseInt(contactId as string),
+        ownerId: 1, // Current user id placeholder
+      };
+      return apiRequest("POST", "/api/deals", dealData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/contacts/${contactId}/deals`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/pipeline'] });
+      
+      toast({
+        title: "Deal created successfully",
+        description: "The new deal has been added to the pipeline",
+      });
+      
+      setIsDealDialogOpen(false);
+      dealForm.reset({
+        name: "",
+        description: "",
+        value: 0,
+        stageId: 1,
+        expectedCloseDate: "",
+        probability: 50,
+      });
+    },
+    onError: (error) => {
+      console.error("Error creating deal:", error);
+      toast({
+        title: "Failed to create deal",
+        description: "There was an error creating the deal. Please try again.",
+        variant: "destructive",
+      });
+    },
+    onSettled: () => {
+      setIsSubmittingDeal(false);
+    }
+  });
+
+  // Handle deal form submission
+  const onSubmitDeal = (data: DealFormValues) => {
+    setIsSubmittingDeal(true);
+    createDealMutation.mutate(data);
   };
 
   if (isLoading || !contact) {
@@ -674,18 +822,229 @@ export default function ContactDetail() {
 
         <TabsContent value="deals">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Related Deals</CardTitle>
+              <Button
+                onClick={() => {
+                  setIsDealDialogOpen(true);
+                  dealForm.reset({
+                    name: "",
+                    description: "",
+                    value: 0,
+                    stageId: pipelineData?.stages?.[0]?.id || 1,
+                    expectedCloseDate: "",
+                    probability: 50,
+                  });
+                }}
+              >
+                + Add New Deal
+              </Button>
             </CardHeader>
             <CardContent>
-              <p className="text-center text-slate-500 py-8">No deals found for this contact.</p>
-              <div className="flex justify-center">
-                <Button>
-                  + Add New Deal
-                </Button>
-              </div>
+              {dealsData?.deals && dealsData.deals.length > 0 ? (
+                <div className="space-y-4">
+                  {dealsData.deals.map((deal) => (
+                    <div key={deal.id} className="flex flex-col rounded-lg border p-4">
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <h4 className="font-medium text-lg">{deal.name}</h4>
+                          <p className="text-slate-500 text-sm">
+                            {pipelineData?.stages?.find(s => s.id === deal.stageId)?.name || 'Unknown Stage'}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold text-lg">${deal.value.toLocaleString()}</p>
+                          <p className="text-slate-500 text-sm">{deal.probability}% probability</p>
+                        </div>
+                      </div>
+                      
+                      {deal.description && (
+                        <p className="text-sm text-slate-600 dark:text-slate-400 my-2">
+                          {deal.description}
+                        </p>
+                      )}
+                      
+                      <div className="flex justify-between items-center text-xs text-slate-500 mt-3">
+                        <div className="flex items-center space-x-3">
+                          {deal.expectedCloseDate && (
+                            <span className="flex items-center">
+                              <Calendar className="h-3 w-3 mr-1" />
+                              {new Date(deal.expectedCloseDate).toLocaleDateString()}
+                            </span>
+                          )}
+                          {usersData?.users && usersData.users.find(u => u.id === deal.ownerId) && (
+                            <span className="flex items-center">
+                              <User className="h-3 w-3 mr-1" />
+                              {usersData.users.find(u => u.id === deal.ownerId)?.name}
+                            </span>
+                          )}
+                        </div>
+                        <span className="flex items-center hover:underline cursor-pointer" 
+                              onClick={() => navigate(`/pipeline?deal=${deal.id}`)}>
+                          <ExternalLink className="h-3 w-3 mr-1" />
+                          View in Pipeline
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-center text-slate-500 py-8">No deals associated with this contact.</p>
+              )}
             </CardContent>
           </Card>
+
+          <Dialog open={isDealDialogOpen} onOpenChange={setIsDealDialogOpen}>
+            <DialogContent className="sm:max-w-[600px]">
+              <DialogHeader>
+                <DialogTitle>Create New Deal</DialogTitle>
+                <DialogDescription>
+                  Add a new deal associated with this contact.
+                </DialogDescription>
+              </DialogHeader>
+              
+              <Form {...dealForm}>
+                <form onSubmit={dealForm.handleSubmit(onSubmitDeal)} className="space-y-4 mt-2">
+                  <FormField
+                    control={dealForm.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Deal Name*</FormLabel>
+                        <FormControl>
+                          <Input placeholder="What's the deal about?" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={dealForm.control}
+                      name="value"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Deal Value ($)*</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              placeholder="0.00" 
+                              {...field}
+                              onChange={(e) => {
+                                const value = e.target.value === "" ? "0" : e.target.value;
+                                field.onChange(parseFloat(value));
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={dealForm.control}
+                      name="probability"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Probability (%)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              min="0" 
+                              max="100" 
+                              placeholder="50" 
+                              {...field}
+                              onChange={(e) => {
+                                const value = e.target.value === "" ? "0" : e.target.value;
+                                field.onChange(parseInt(value, 10));
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={dealForm.control}
+                      name="stageId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Pipeline Stage*</FormLabel>
+                          <Select
+                            value={field.value.toString()}
+                            onValueChange={(value) => field.onChange(parseInt(value))}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select pipeline stage" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {pipelineData?.stages && pipelineData.stages.map((stage) => (
+                                <SelectItem key={stage.id} value={stage.id.toString()}>
+                                  {stage.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={dealForm.control}
+                      name="expectedCloseDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Expected Close Date</FormLabel>
+                          <FormControl>
+                            <Input type="date" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <FormField
+                    control={dealForm.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Additional details about the deal" 
+                            className="resize-none min-h-[100px]" 
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <DialogFooter className="mt-6">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsDealDialogOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={isSubmittingDeal}>
+                      {isSubmittingDeal ? "Creating..." : "Create Deal"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         <TabsContent value="activities">
@@ -702,9 +1061,9 @@ export default function ContactDetail() {
               </Button>
             </CardHeader>
             <CardContent>
-              {activities.length > 0 ? (
+              {activitiesData?.activities && activitiesData.activities.length > 0 ? (
                 <div className="space-y-4">
-                  {activities.map((activity) => (
+                  {activitiesData.activities.map((activity) => (
                     <div key={activity.id} className="flex items-start gap-4 p-4 border-b dark:border-gray-700">
                       <div className={`p-2 rounded-full ${
                         activity.type === 'call' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' :
@@ -830,18 +1189,269 @@ export default function ContactDetail() {
 
         <TabsContent value="tasks">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Related Tasks</CardTitle>
+              <Button
+                onClick={() => {
+                  setIsTaskDialogOpen(true);
+                  taskForm.reset({
+                    title: "",
+                    description: "",
+                    dueDate: "",
+                    time: "",
+                    priority: "medium",
+                    assignedTo: 1,
+                  });
+                }}
+              >
+                + Create Task
+              </Button>
             </CardHeader>
             <CardContent>
-              <p className="text-center text-slate-500 py-8">No tasks found for this contact.</p>
-              <div className="flex justify-center">
-                <Button>
-                  + Create Task
-                </Button>
-              </div>
+              {tasksData?.tasks && tasksData.tasks.length > 0 ? (
+                <div className="space-y-4">
+                  {tasksData.tasks.map((task) => (
+                    <div 
+                      key={task.id} 
+                      className={`flex items-start gap-4 p-4 border rounded-lg ${
+                        task.completed ? 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700' : 
+                        task.priority === 'high' ? 'border-red-200 dark:border-red-900/50' :
+                        task.priority === 'medium' ? 'border-amber-200 dark:border-amber-900/50' :
+                        'border-blue-200 dark:border-blue-900/50'
+                      }`}
+                    >
+                      <div>
+                        <div className={`p-2 rounded-full ${
+                          task.priority === 'high' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
+                          task.priority === 'medium' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' :
+                          'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                        }`}>
+                          {task.completed ? (
+                            <Check className="h-4 w-4" />
+                          ) : (
+                            task.priority === 'high' ? (
+                              <AlertCircle className="h-4 w-4" />
+                            ) : task.priority === 'medium' ? (
+                              <Clock className="h-4 w-4" />
+                            ) : (
+                              <ArrowDown className="h-4 w-4" />
+                            )
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-start justify-between mb-1">
+                          <h4 className={`font-medium ${task.completed ? 'line-through text-slate-500 dark:text-slate-400' : ''}`}>
+                            {task.title}
+                          </h4>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => {
+                              // Toggle task completion via API
+                              apiRequest("PATCH", `/api/tasks/${task.id}/toggle`, {})
+                                .then(() => {
+                                  queryClient.invalidateQueries({ queryKey: [`/api/contacts/${contactId}/tasks`] });
+                                  toast({
+                                    title: task.completed ? "Task reopened" : "Task marked as complete",
+                                    description: task.completed ? "The task has been reopened" : "The task has been marked as complete",
+                                  });
+                                })
+                                .catch((error) => {
+                                  console.error("Error toggling task:", error);
+                                  toast({
+                                    title: "Error updating task",
+                                    description: "There was a problem updating the task status",
+                                    variant: "destructive",
+                                  });
+                                });
+                            }}
+                          >
+                            {task.completed ? "Reopen" : "Complete"}
+                          </Button>
+                        </div>
+                        
+                        {task.description && (
+                          <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+                            {task.description}
+                          </p>
+                        )}
+                        
+                        <div className="flex items-center text-xs text-slate-500 space-x-3">
+                          {task.dueDate && (
+                            <span className="flex items-center">
+                              <Calendar className="h-3 w-3 mr-1" />
+                              {new Date(task.dueDate).toLocaleDateString()}
+                            </span>
+                          )}
+                          {task.time && (
+                            <span className="flex items-center">
+                              <Clock className="h-3 w-3 mr-1" />
+                              {task.time}
+                            </span>
+                          )}
+                          {usersData?.users && usersData.users.find(u => u.id === task.assignedTo) && (
+                            <span className="flex items-center">
+                              <User className="h-3 w-3 mr-1" />
+                              {usersData.users.find(u => u.id === task.assignedTo)?.name}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-center text-slate-500 py-8">No tasks found for this contact.</p>
+              )}
             </CardContent>
           </Card>
+
+          <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
+            <DialogContent className="sm:max-w-[600px]">
+              <DialogHeader>
+                <DialogTitle>Create New Task</DialogTitle>
+                <DialogDescription>
+                  Add a new task related to this contact.
+                </DialogDescription>
+              </DialogHeader>
+              
+              <Form {...taskForm}>
+                <form onSubmit={taskForm.handleSubmit(onSubmitTask)} className="space-y-4 mt-2">
+                  <FormField
+                    control={taskForm.control}
+                    name="title"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Task Title*</FormLabel>
+                        <FormControl>
+                          <Input placeholder="What needs to be done?" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={taskForm.control}
+                      name="dueDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Due Date</FormLabel>
+                          <FormControl>
+                            <Input type="date" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={taskForm.control}
+                      name="time"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Time</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g. 10:00 AM - 11:00 AM" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={taskForm.control}
+                      name="priority"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Priority</FormLabel>
+                          <Select
+                            value={field.value}
+                            onValueChange={field.onChange}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select priority level" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="high">High</SelectItem>
+                              <SelectItem value="medium">Medium</SelectItem>
+                              <SelectItem value="low">Low</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={taskForm.control}
+                      name="assignedTo"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Assigned To</FormLabel>
+                          <Select
+                            value={field.value.toString()}
+                            onValueChange={(value) => field.onChange(parseInt(value))}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Assign to someone" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {usersData?.users && usersData.users.map((user) => (
+                                <SelectItem key={user.id} value={user.id.toString()}>
+                                  {user.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <FormField
+                    control={taskForm.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Additional details about the task" 
+                            className="resize-none min-h-[100px]" 
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <DialogFooter className="mt-6">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsTaskDialogOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={isSubmittingTask}>
+                      {isSubmittingTask ? "Creating..." : "Create Task"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
       </Tabs>
     </main>
