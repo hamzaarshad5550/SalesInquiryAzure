@@ -1,0 +1,77 @@
+Develop a complete fix for the broken CRM application with the following specific corrections:
+Dashboard Page:
+Fix the 'Export' button to properly export data in CSV/Excel format
+Repair 'Add New Task' button to open a functional task creation modal
+Ensure all dashboard widgets load without errors
+Quick Actions:
+Fix all three buttons:
+'New Deal' - should open deal creation form
+'Add Contact' - should open contact creation form
+'New Task' - should open task creation form
+Repair notification system to show real-time alerts
+Pipeline Page:Implement working drag-and-drop functionality between stages (Lead → Qualified → Proposal → Closed)
+Fix 'New Deal' button to properly create and save deals
+Add new 'Pipeline Settings' button that allows:
+Reordering pipeline stages via drag-and-drop
+Adding new pipeline stages
+Editing stage names and properties
+Contacts Page:
+Fix contact editing functionality:
+Working 'Log Activity' button with proper history tracking
+Functional 'Create Task' button that pre-fills contact association
+Working 'Add New Deal' button that auto-links to contact
+Repair profile picture upload with:
+Image cropping/preview
+Proper file type validation
+Database storage integration
+Tasks Page:
+Fix task editing:
+All fields should be updatable
+Changes should save to database
+Repair 'Create Task' button to:
+Properly validate all required fields
+Show success/error messages
+Update task list in real-time
+Implement working task search with:
+Text filtering
+Status/priority filters
+Instant results updating
+Messages Page:
+Fix email integration:
+Proper compose window
+Contact auto-complete
+Attachment support
+Repair 'New Message' button
+Implement message threading
+Settings Page:
+Fix all setting categories to:
+Save preferences properly
+Show appropriate toggles/inputs
+Repair profile editing:
+All fields should be editable
+Changes should persist
+No application freezing
+Fix profile picture upload
+Technical Requirements:
+Use React.js for frontend fixes
+Implement Redux for state management
+Use Firebase/PostgreSQL for data persistence
+Ensure all API endpoints return proper responses
+Add error handling for all actions
+Implement proper loading states
+Include success/error notifications
+Add input validation throughout
+Optimize database queries
+Deliverables:
+Fully functional CRM with all above fixes
+Documentation of all changes made
+Testing protocol to verify fixes
+Recommendations for preventing similar issues"
+This prompt:
+Is extremely specific about each broken component
+Provides technical implementation guidance
+Includes UI/UX expectations
+Specifies backend requirements
+Defines expected deliverables
+Covers both functional and technical aspects
+Addresses the entire user workflow

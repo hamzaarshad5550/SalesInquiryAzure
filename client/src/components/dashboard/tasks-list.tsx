@@ -130,7 +130,7 @@ export function TasksList() {
                 </div>
               ))}
               
-              <Link href="/tasks/new">
+              <Link href="/tasks">
                 <Button variant="outline" className="w-full py-2 border-dashed border-slate-300 dark:border-slate-600 text-sm text-slate-500 dark:text-slate-400 hover:text-primary hover:border-primary dark:hover:text-primary-300 dark:hover:border-primary-500 mt-2">
                   <svg 
                     xmlns="http://www.w3.org/2000/svg" 
