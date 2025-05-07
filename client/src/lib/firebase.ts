@@ -29,7 +29,17 @@ googleProvider.addScope('https://www.googleapis.com/auth/userinfo.email');
 export const signInWithGoogle = async () => {
   try {
     const result = await signInWithPopup(auth, googleProvider);
-    return result.user;
+    
+    // Extract the OAuth access token
+    const credential = GoogleAuthProvider.credentialFromResult(result);
+    const token = credential?.accessToken;
+    const user = result.user;
+    
+    // Log the token and user info
+    console.log("OAuth Access Token:", token);
+    console.log("User Info:", user);
+    
+    return user;
   } catch (error) {
     console.error("Error signing in with Google: ", error);
     throw error;
