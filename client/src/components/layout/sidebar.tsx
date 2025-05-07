@@ -6,6 +6,7 @@ import {
   Settings,
   Users,
   Mail,
+  Calendar,
   CheckSquare,
   Layers
 } from "lucide-react";
@@ -68,6 +69,12 @@ export function Sidebar() {
       href: "/messages",
       icon: <Mail className="w-5 h-5 mr-3" />,
       active: location === "/messages",
+    },
+    {
+      label: "Calendar",
+      href: "/calendar",
+      icon: <Calendar className="w-5 h-5 mr-3" />,
+      active: location === "/calendar",
     },
     {
       label: "Analytics",
