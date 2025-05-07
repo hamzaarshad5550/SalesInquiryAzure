@@ -9,6 +9,7 @@ import Pipeline from "@/pages/pipeline";
 import Contacts from "@/pages/contacts";
 import ContactForm from "@/pages/contact-form";
 import ContactDetail from "@/pages/contact-detail";
+import ContactsGoogle from "@/pages/contacts-google";
 import Tasks from "@/pages/tasks";
 import Messages from "@/pages/messages";
 import Analytics from "@/pages/analytics";
@@ -54,6 +55,7 @@ function Router() {
           <Route path="/contacts" component={Contacts} />
           <Route path="/contacts/new" component={ContactForm} />
           <Route path="/contacts/:id" component={ContactDetail} />
+          <Route path="/contacts-google" component={ContactsGoogle} />
           <Route path="/tasks" component={Tasks} />
           <Route path="/messages" component={Messages} />
           <Route path="/calendar" component={Calendar} />

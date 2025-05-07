@@ -8,7 +8,8 @@ import {
   Mail,
   Calendar,
   CheckSquare,
-  Layers
+  Layers,
+  UserCircle
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useQuery } from "@tanstack/react-query";
@@ -69,6 +70,12 @@ export function Sidebar() {
       href: "/messages",
       icon: <Mail className="w-5 h-5 mr-3" />,
       active: location === "/messages",
+    },
+    {
+      label: "Google Contacts",
+      href: "/contacts-google",
+      icon: <UserCircle className="w-5 h-5 mr-3" />,
+      active: location === "/contacts-google",
     },
     {
       label: "Calendar",

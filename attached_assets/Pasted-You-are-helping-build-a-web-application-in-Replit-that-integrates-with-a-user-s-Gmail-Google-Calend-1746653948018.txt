@@ -1,0 +1,44 @@
+You are helping build a web application in Replit that integrates with a user's Gmail, Google Calendar, and Contacts. The app should allow the user to:
+
+1. Log in with Google and get their Gmail profile info.
+2. Load Gmail messages and allow replying to emails.
+3. Read and update the user’s Google Calendar (view events, add appointments).
+4. Load and sync Gmail Contacts (view and add).
+5. All changes (replies, added contacts, events) should reflect back into the user's actual Gmail/Calendar/Contacts (sync is two-way).
+
+Fix any issues related to OAuth or redirect URL failures.
+
+Make sure:
+- Proper Google OAuth 2.0 scopes are used.
+- Gmail API, Calendar API, and People API are enabled.
+- Discovery Docs are used for all 3 APIs.
+- The app is deployed on Replit (e.g., https://<project-name>.<user>.repl.co or Janeway custom domain).
+- Authorized JavaScript origins and redirect URIs are correctly set to match the Replit deployment URL.
+
+Write a full HTML + JavaScript (Vanilla JS) code snippet that:
+✅ Initializes Google API client  
+✅ Performs login  
+✅ Displays Gmail profile info  
+✅ Loads Gmail inbox (subject + sender)  
+✅ Replies to an email  
+✅ Loads Google Calendar events and adds an appointment  
+✅ Lists existing Gmail contacts and adds a new one  
+
+Use the following scopes:
+
+const SCOPES = [ 'https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.send', 'https://www.googleapis.com/auth/gmail.modify', 'https://www.googleapis.com/auth/userinfo.profile', 'https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/contacts.readonly', 'https://www.googleapis.com/auth/contacts' ].join(' ');
+
+And add scopes which should be there according to our application.
+
+Assume I’ve already created a Google OAuth 2.0 Client ID and added the Replit URL to Authorized JavaScript Origins and Redirect URIs.
+
+The code should:
+- Use gapi.client.init() with correct discoveryDocs for Gmail, Calendar, and People API
+- Use `gapi.auth2.getAuthInstance().signIn()` for login
+- Include working buttons: Login, Load Profile, Load Gmail, Reply Email, Load Calendar, Add Event, Load Contacts, Add Contact
+- Show the results in simple HTML
+
+At the end, include instructions to:
+- Enable Gmail API, People API, and Calendar API in Google Cloud Console.
+- Where to paste the OAuth Client ID and API key in the code.
+
