@@ -13,6 +13,9 @@ import Tasks from "@/pages/tasks";
 import Messages from "@/pages/messages";
 import Analytics from "@/pages/analytics";
 import Settings from "@/pages/settings";
+import Login from "@/pages/login";
+import Calendar from "@/pages/calendar";
+import { AuthProvider } from "./context/AuthContext";
 import { Sidebar } from "@/components/layout/sidebar";
 import { TopBar } from "@/components/layout/top-bar";
 import { useState } from "react";
@@ -46,12 +49,14 @@ function Router() {
         
         <Switch>
           <Route path="/" component={Dashboard} />
+          <Route path="/login" component={Login} />
           <Route path="/pipeline" component={Pipeline} />
           <Route path="/contacts" component={Contacts} />
           <Route path="/contacts/new" component={ContactForm} />
           <Route path="/contacts/:id" component={ContactDetail} />
           <Route path="/tasks" component={Tasks} />
           <Route path="/messages" component={Messages} />
+          <Route path="/calendar" component={Calendar} />
           <Route path="/analytics" component={Analytics} />
           <Route path="/settings" component={Settings} />
           <Route component={NotFound} />
@@ -65,8 +70,10 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="system">
-        <Router />
-        <Toaster />
+        <AuthProvider>
+          <Router />
+          <Toaster />
+        </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

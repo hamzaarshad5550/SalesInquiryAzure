@@ -166,21 +166,29 @@ export default function Messages() {
           <Pagination className="w-full">
             <PaginationContent>
               <PaginationItem>
-                <PaginationPrevious
+                <Button 
+                  variant="outline" 
+                  size="sm" 
                   onClick={handlePrevPage}
-                  className={prevPageTokens.length === 0 ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
                   disabled={prevPageTokens.length === 0}
-                />
+                  className={prevPageTokens.length === 0 ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+                >
+                  Previous
+                </Button>
               </PaginationItem>
               <PaginationItem>
-                <PaginationLink>Page</PaginationLink>
+                <div className="flex items-center justify-center px-4">Page</div>
               </PaginationItem>
               <PaginationItem>
-                <PaginationNext
+                <Button 
+                  variant="outline" 
+                  size="sm" 
                   onClick={handleNextPage}
-                  className={!nextPageToken ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
                   disabled={!nextPageToken}
-                />
+                  className={!nextPageToken ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+                >
+                  Next
+                </Button>
               </PaginationItem>
             </PaginationContent>
           </Pagination>

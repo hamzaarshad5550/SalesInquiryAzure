@@ -1,9 +1,9 @@
 import { useTheme } from "@/components/ui/theme-provider";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PlusIcon, UserPlusIcon, ListTodoIcon, Sun, Moon, Menu, Bell } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useMobile } from "@/hooks/use-mobile";
+import { UserProfile } from "./user-profile";
 
 type TopBarProps = {
   onMenuClick: () => void;
@@ -80,27 +80,8 @@ export function TopBar({ onMenuClick }: TopBarProps) {
             {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
           </Button>
 
-          {!isMobile && (
-            <div className="hidden md:flex items-center">
-              <Avatar className="h-8 w-8">
-                <AvatarImage src={user?.avatarUrl} alt={user?.name} />
-                <AvatarFallback>{user?.name?.slice(0, 2)}</AvatarFallback>
-              </Avatar>
-              <span className="ml-2 font-medium text-sm">{user?.name}</span>
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                className="h-3.5 w-3.5 ml-2 text-slate-500" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                strokeLinecap="round" 
-                strokeLinejoin="round"
-              >
-                <path d="m6 9 6 6 6-6" />
-              </svg>
-            </div>
-          )}
+          {/* Import from Firebase auth or fallback to local user */}
+          {!isMobile && <UserProfile />}
         </div>
       </div>
     </header>
