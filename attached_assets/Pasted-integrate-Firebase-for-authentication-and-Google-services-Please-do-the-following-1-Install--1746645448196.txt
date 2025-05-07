@@ -1,0 +1,56 @@
+integrate Firebase for authentication and Google services. Please do the following:
+
+1. **Install Firebase SDK**  
+   - Run: `npm install firebase`
+
+2. **Firebase Initialization**  
+
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyB25XShHVczxQQUpiabZM0eYuVcgsmvlUg",
+  authDomain: "rayyan-ai-4ef4c.firebaseapp.com",
+  projectId: "rayyan-ai-4ef4c",
+  storageBucket: "rayyan-ai-4ef4c.firebasestorage.app",
+  messagingSenderId: "88311205730",
+  appId: "1:88311205730:web:996300456c7998e5dbe63b",
+  measurementId: "G-SY0XB69EB4"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+
+3. **Google Authentication Flow**
+   - Add a **login page** with:
+     - "Login with Google" button
+     - Option to register if not logged in
+   - Use Firebase Authentication with `GoogleAuthProvider`
+   - After login:
+     - Display the user's display name and profile picture
+     - Show a "Logout" button
+     - Handle session state with `onAuthStateChanged()`
+
+4. **Messages Module**
+   - After successful login:
+     - Fetch the user's recent emails (simulate if Gmail API is not available)
+     - Show results with pagination: 15 emails per page
+
+5. **Calendar Module**
+   - Integrate Google Calendar API
+   - Show the user's calendar month view
+   - Load events dynamically as the user navigates between months
+
+6. **UI Requirements**
+   - Use basic HTML with IDs:
+     - `loginBtn`, `logoutBtn`, `userInfo`, `messageContainer`, `calendarView`
+   - Implement pagination logic in the Messages module
+   - Use clear, modular JavaScript for maintainability
+
+Please generate the complete code structure to support all of the above.

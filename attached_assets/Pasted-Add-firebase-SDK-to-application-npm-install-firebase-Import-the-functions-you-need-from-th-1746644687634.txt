@@ -1,0 +1,67 @@
+Add firebase SDK to application 
+
+npm install firebase
+
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyB25XShHVczxQQUpiabZM0eYuVcgsmvlUg",
+  authDomain: "rayyan-ai-4ef4c.firebaseapp.com",
+  projectId: "rayyan-ai-4ef4c",
+  storageBucket: "rayyan-ai-4ef4c.firebasestorage.app",
+  messagingSenderId: "88311205730",
+  appId: "1:88311205730:web:996300456c7998e5dbe63b",
+  measurementId: "G-SY0XB69EB4"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+
+Add a login button:
+<button id="loginBtn">Login with Google</button>
+Add this script 
+<script>
+  const provider = new firebase.auth.GoogleAuthProvider();
+
+  document.getElementById("loginBtn").addEventListener("click", () => {
+    firebase.auth().signInWithPopup(provider)
+      .then((result) => {
+        const user = result.user;
+        alert("Logged in as: " + user.displayName);
+        console.log(user);
+      })
+      .catch((error) => {
+        console.error("Login Error:", error);
+      });
+  });
+</script>
+
+Show user info or logout
+
+<button id="logoutBtn">Logout</button>
+<div id="userInfo"></div>
+
+<script>
+  firebase.auth().onAuthStateChanged((user) => {
+    if (user) {
+      document.getElementById("userInfo").innerHTML = `
+        Welcome, ${user.displayName} <br>
+        <img src="${user.photoURL}" width="50"/>
+      `;
+    }
+  });
+
+  document.getElementById("logoutBtn").addEventListener("click", () => {
+    firebase.auth().signOut().then(() => {
+      alert("Logged out!");
+      location.reload();
+    });
+  });
+</script>
