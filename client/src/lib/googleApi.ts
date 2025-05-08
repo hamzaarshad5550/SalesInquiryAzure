@@ -23,64 +23,65 @@ const SCOPES = [
  * Initialize the Google API client
  * @param token OAuth token to use for authorization
  */
+// Keep track of initialization state to avoid redundant calls
+let isInitializing = false;
+let isInitialized = false;
+let initializationPromise: Promise<void> | null = null;
+
 export const initGoogleApi = (token?: string | null): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    console.log('Initializing Google API with token:', token ? 'Token exists' : 'No token');
-    
+  // If already initialized, return immediately
+  if (isInitialized && token) {
+    return Promise.resolve();
+  }
+  
+  // If initialization is in progress, return the existing promise
+  if (isInitializing && initializationPromise) {
+    return initializationPromise;
+  }
+  
+  // Start new initialization
+  isInitializing = true;
+  
+  initializationPromise = new Promise((resolve, reject) => {
     // Check if gapi is available
     if (typeof gapi === 'undefined' || !gapi) {
-      console.error('Google API client not loaded - gapi is undefined');
+      isInitializing = false;
       reject(new Error('Google API client not loaded'));
       return;
     }
     
     // First check if token exists
     if (!token) {
-      console.error('No OAuth token provided for Google API initialization');
+      isInitializing = false;
       reject(new Error('No OAuth token provided'));
       return;
     }
     
-    console.log('Loading gapi client...');
-    
     // Load the client library
     gapi.load('client', async () => {
       try {
-        console.log('Initializing gapi client with discovery docs...');
-        
         // Initialize the client without auth first
         await gapi.client.init({
           discoveryDocs: DISCOVERY_DOCS,
         });
         
-        console.log('Setting access token...');
-        
         // Set the token in the client
         gapi.client.setToken({ access_token: token });
         
-        // Verify API availability by checking client objects
-        const hasGmail = Boolean(gapi.client.gmail);
-        const hasCalendar = Boolean(gapi.client.calendar);
-        const hasPeople = Boolean(gapi.client.people);
+        // Mark as initialized
+        isInitialized = true;
+        isInitializing = false;
         
-        console.log('Google API services available:', { 
-          gmail: hasGmail, 
-          calendar: hasCalendar, 
-          people: hasPeople 
-        });
-        
-        if (!hasGmail && !hasCalendar && !hasPeople) {
-          console.warn('None of the required Google API services are available');
-        }
-        
-        console.log('Google API client initialized successfully');
         resolve();
       } catch (error) {
         console.error('Error initializing Google API client:', error);
+        isInitializing = false;
         reject(error);
       }
     });
   });
+  
+  return initializationPromise;
 };
 
 /**
@@ -88,30 +89,10 @@ export const initGoogleApi = (token?: string | null): Promise<void> => {
  */
 export const getGmailMessages = async (maxResults = 15, pageToken?: string) => {
   try {
-    // Check if API is initialized
-    if (!gapi) {
-      console.error('Gmail API not initialized - gapi is undefined');
-      throw new Error('Gmail API not initialized');
-    }
-    
-    if (!gapi.client) {
-      console.error('Gmail API not initialized - gapi.client is undefined');
-      throw new Error('Gmail API client not initialized');
-    }
-    
-    if (!gapi.client.gmail) {
-      console.error('Gmail API not initialized - gapi.client.gmail is undefined');
-      
-      // Check what services are available
-      const availableServices = Object.keys(gapi.client).filter(key => 
-        typeof gapi.client[key] === 'object' && gapi.client[key] !== null
-      );
-      
-      console.error('Available API services:', availableServices);
+    // Simplified API check - only check the final required service
+    if (!gapi?.client?.gmail) {
       throw new Error('Gmail API service not available');
     }
-    
-    console.log('Fetching Gmail messages list...');
     
     // Request list of messages
     const response = await gapi.client.gmail.users.messages.list({
@@ -120,42 +101,32 @@ export const getGmailMessages = async (maxResults = 15, pageToken?: string) => {
       pageToken,
     });
     
-    // Log response status
-    console.log('Gmail messages list response status:', response.status);
-    
     if (!response.result) {
-      console.error('No result in Gmail API response');
       return { messages: [], nextPageToken: undefined };
     }
     
     if (!response.result.messages || response.result.messages.length === 0) {
-      console.log('No Gmail messages found');
       return { messages: [], nextPageToken: undefined };
     }
     
-    console.log(`Found ${response.result.messages.length} Gmail messages`);
-    
     // Fetch message details for each message ID
-    const messagePromises = response.result.messages.map((message: any) => {
-      console.log(`Fetching details for message ${message.id}...`);
-      return gapi.client.gmail.users.messages.get({
+    const messagePromises = response.result.messages.map((message: any) => 
+      gapi.client.gmail.users.messages.get({
         userId: 'me',
         id: message.id,
         format: 'metadata',
         metadataHeaders: ['Subject', 'From', 'Date'],
-      });
-    });
+      })
+    );
 
     try {
       const messageDetails = await Promise.all(messagePromises);
-      console.log(`Successfully fetched details for ${messageDetails.length} messages`);
       
       return {
         messages: messageDetails.map((msg: any) => {
           const { id, threadId, labelIds, payload } = msg.result;
           
           if (!payload || !payload.headers) {
-            console.warn(`Message ${id} has no payload or headers`);
             return {
               id,
               threadId,
@@ -185,7 +156,6 @@ export const getGmailMessages = async (maxResults = 15, pageToken?: string) => {
         nextPageToken: response.result.nextPageToken,
       };
     } catch (detailsError: any) {
-      console.error('Error fetching message details:', detailsError);
       throw new Error(`Failed to fetch message details: ${detailsError.message}`);
     }
   } catch (error: any) {
@@ -213,30 +183,10 @@ export const getGmailMessages = async (maxResults = 15, pageToken?: string) => {
  */
 export const getCalendarEvents = async (timeMin: string, timeMax: string) => {
   try {
-    // Check if API is initialized
-    if (!gapi) {
-      console.error('Calendar API not initialized - gapi is undefined');
-      throw new Error('Calendar API not initialized');
-    }
-    
-    if (!gapi.client) {
-      console.error('Calendar API not initialized - gapi.client is undefined');
-      throw new Error('Calendar API client not initialized');
-    }
-    
-    if (!gapi.client.calendar) {
-      console.error('Calendar API not initialized - gapi.client.calendar is undefined');
-      
-      // Check what services are available
-      const availableServices = Object.keys(gapi.client).filter(key => 
-        typeof gapi.client[key] === 'object' && gapi.client[key] !== null
-      );
-      
-      console.error('Available API services:', availableServices);
+    // Simplified API check - only check the final required service
+    if (!gapi?.client?.calendar) {
       throw new Error('Calendar API service not available');
     }
-    
-    console.log('Fetching calendar events...');
     
     const response = await gapi.client.calendar.events.list({
       calendarId: 'primary',
@@ -246,12 +196,8 @@ export const getCalendarEvents = async (timeMin: string, timeMax: string) => {
       orderBy: 'startTime',
     });
     
-    console.log(`Successfully fetched ${response.result.items?.length || 0} calendar events`);
-    
     return response.result.items || [];
   } catch (error: any) {
-    console.error('Error fetching calendar events:', error);
-    
     // Provide more detailed error messages based on error type
     if (error.status === 401) {
       throw new Error('Authentication required to access Calendar. Please log out and log in again.');
@@ -285,30 +231,10 @@ export const getMonthDateRange = (year: number, month: number) => {
  */
 export const getContacts = async (pageSize = 50, pageToken?: string) => {
   try {
-    // Check if API is initialized
-    if (!gapi) {
-      console.error('Contacts API not initialized - gapi is undefined');
-      throw new Error('Contacts API not initialized');
-    }
-    
-    if (!gapi.client) {
-      console.error('Contacts API not initialized - gapi.client is undefined');
-      throw new Error('Contacts API client not initialized');
-    }
-    
-    if (!gapi.client.people) {
-      console.error('Contacts API not initialized - gapi.client.people is undefined');
-      
-      // Check what services are available
-      const availableServices = Object.keys(gapi.client).filter(key => 
-        typeof gapi.client[key] === 'object' && gapi.client[key] !== null
-      );
-      
-      console.error('Available API services:', availableServices);
+    // Simplified API check - only check the final required service
+    if (!gapi?.client?.people) {
       throw new Error('People API service not available');
     }
-    
-    console.log('Fetching Google contacts...');
     
     const response = await gapi.client.people.people.connections.list({
       resourceName: 'people/me',
@@ -317,15 +243,11 @@ export const getContacts = async (pageSize = 50, pageToken?: string) => {
       personFields: 'names,emailAddresses,phoneNumbers',
     });
     
-    console.log(`Successfully fetched ${response.result.connections?.length || 0} contacts`);
-    
     return {
       contacts: response.result.connections || [],
       nextPageToken: response.result.nextPageToken,
     };
   } catch (error: any) {
-    console.error('Error fetching contacts:', error);
-    
     // Provide more detailed error messages based on error type
     if (error.status === 401) {
       throw new Error('Authentication required to access Contacts. Please log out and log in again.');
@@ -348,30 +270,10 @@ export const getContacts = async (pageSize = 50, pageToken?: string) => {
  */
 export const sendEmailReply = async (threadId: string, to: string, subject: string, body: string) => {
   try {
-    // Check if API is initialized
-    if (!gapi) {
-      console.error('Gmail API not initialized - gapi is undefined');
-      throw new Error('Gmail API not initialized');
-    }
-    
-    if (!gapi.client) {
-      console.error('Gmail API not initialized - gapi.client is undefined');
-      throw new Error('Gmail API client not initialized');
-    }
-    
-    if (!gapi.client.gmail) {
-      console.error('Gmail API not initialized - gapi.client.gmail is undefined');
-      
-      // Check what services are available
-      const availableServices = Object.keys(gapi.client).filter(key => 
-        typeof gapi.client[key] === 'object' && gapi.client[key] !== null
-      );
-      
-      console.error('Available API services:', availableServices);
+    // Simplified API check - only check the final required service
+    if (!gapi?.client?.gmail) {
       throw new Error('Gmail API service not available');
     }
-    
-    console.log(`Sending email reply to ${to} with subject: ${subject}`);
     
     // Create the email content
     const emailContent = [
@@ -399,8 +301,6 @@ export const sendEmailReply = async (threadId: string, to: string, subject: stri
       }
     });
     
-    console.log('Successfully sent email reply:', response.result);
-    
     return response.result;
   } catch (error: any) {
     console.error('Error sending email reply:', error);
@@ -427,30 +327,10 @@ export const sendEmailReply = async (threadId: string, to: string, subject: stri
  */
 export const createCalendarEvent = async (summary: string, description: string, start: Date, end: Date, location?: string) => {
   try {
-    // Check if API is initialized
-    if (!gapi) {
-      console.error('Calendar API not initialized - gapi is undefined');
-      throw new Error('Calendar API not initialized');
-    }
-    
-    if (!gapi.client) {
-      console.error('Calendar API not initialized - gapi.client is undefined');
-      throw new Error('Calendar API client not initialized');
-    }
-    
-    if (!gapi.client.calendar) {
-      console.error('Calendar API not initialized - gapi.client.calendar is undefined');
-      
-      // Check what services are available
-      const availableServices = Object.keys(gapi.client).filter(key => 
-        typeof gapi.client[key] === 'object' && gapi.client[key] !== null
-      );
-      
-      console.error('Available API services:', availableServices);
+    // Simplified API check - only check the final required service
+    if (!gapi?.client?.calendar) {
       throw new Error('Calendar API service not available');
     }
-    
-    console.log('Creating new calendar event:', summary);
     
     const event = {
       summary,
@@ -470,8 +350,6 @@ export const createCalendarEvent = async (summary: string, description: string, 
       calendarId: 'primary',
       resource: event
     });
-    
-    console.log('Successfully created calendar event:', response.result);
     
     return response.result;
   } catch (error: any) {

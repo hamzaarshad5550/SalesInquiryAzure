@@ -34,20 +34,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Initialize Google API when user is authenticated
   useEffect(() => {
+    let isMounted = true;
+    
     if (currentUser && oauthToken) {
-      console.log("Attempting to initialize Google API with token");
-      
       initGoogleApi(oauthToken)
         .then(() => {
-          setIsGoogleApiInitialized(true);
-          console.log("Google API initialized successfully");
+          if (isMounted) {
+            setIsGoogleApiInitialized(true);
+          }
         })
         .catch((error) => {
           console.error("Failed to initialize Google API:", error);
-          // If initialization fails, try clearing the token and auth state
-          sessionStorage.removeItem('oauthToken');
-          setOauthToken(null);
-          setIsGoogleApiInitialized(false);
+          if (isMounted) {
+            // If initialization fails, clear the token and auth state
+            sessionStorage.removeItem('oauthToken');
+            setOauthToken(null);
+            setIsGoogleApiInitialized(false);
+          }
         });
     } else {
       setIsGoogleApiInitialized(false);
@@ -57,6 +60,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         sessionStorage.removeItem('oauthToken');
         setOauthToken(null);
       }
+    }
+    
+    return () => {
+      isMounted = false;
     }
   }, [currentUser, oauthToken]);
 
