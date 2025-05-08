@@ -72,7 +72,7 @@ export default function Messages() {
       
       setLoading(false);
     }
-  }, [isGoogleApiInitialized, oauthToken]);
+  }, [currentUser, isGoogleApiInitialized, oauthToken]);
 
   // Fetch emails when Google API is initialized and we have a valid token
   useEffect(() => {

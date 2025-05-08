@@ -25,9 +25,11 @@ const SCOPES = [
  */
 export const initGoogleApi = (token?: string | null): Promise<void> => {
   return new Promise((resolve, reject) => {
+    console.log('Initializing Google API with token:', token ? 'Token exists' : 'No token');
+    
     // Check if gapi is available
-    if (!gapi) {
-      console.error('Google API client not loaded');
+    if (typeof gapi === 'undefined' || !gapi) {
+      console.error('Google API client not loaded - gapi is undefined');
       reject(new Error('Google API client not loaded'));
       return;
     }
@@ -39,15 +41,38 @@ export const initGoogleApi = (token?: string | null): Promise<void> => {
       return;
     }
     
+    console.log('Loading gapi client...');
+    
+    // Load the client library
     gapi.load('client', async () => {
       try {
+        console.log('Initializing gapi client with discovery docs...');
+        
         // Initialize the client without auth first
         await gapi.client.init({
           discoveryDocs: DISCOVERY_DOCS,
         });
         
+        console.log('Setting access token...');
+        
         // Set the token in the client
         gapi.client.setToken({ access_token: token });
+        
+        // Verify API availability by checking client objects
+        const hasGmail = Boolean(gapi.client.gmail);
+        const hasCalendar = Boolean(gapi.client.calendar);
+        const hasPeople = Boolean(gapi.client.people);
+        
+        console.log('Google API services available:', { 
+          gmail: hasGmail, 
+          calendar: hasCalendar, 
+          people: hasPeople 
+        });
+        
+        if (!hasGmail && !hasCalendar && !hasPeople) {
+          console.warn('None of the required Google API services are available');
+        }
+        
         console.log('Google API client initialized successfully');
         resolve();
       } catch (error) {
@@ -64,34 +89,84 @@ export const initGoogleApi = (token?: string | null): Promise<void> => {
 export const getGmailMessages = async (maxResults = 15, pageToken?: string) => {
   try {
     // Check if API is initialized
-    if (!gapi || !gapi.client || !gapi.client.gmail) {
-      console.error('Gmail API not initialized');
+    if (!gapi) {
+      console.error('Gmail API not initialized - gapi is undefined');
       throw new Error('Gmail API not initialized');
     }
     
+    if (!gapi.client) {
+      console.error('Gmail API not initialized - gapi.client is undefined');
+      throw new Error('Gmail API client not initialized');
+    }
+    
+    if (!gapi.client.gmail) {
+      console.error('Gmail API not initialized - gapi.client.gmail is undefined');
+      
+      // Check what services are available
+      const availableServices = Object.keys(gapi.client).filter(key => 
+        typeof gapi.client[key] === 'object' && gapi.client[key] !== null
+      );
+      
+      console.error('Available API services:', availableServices);
+      throw new Error('Gmail API service not available');
+    }
+    
+    console.log('Fetching Gmail messages list...');
+    
+    // Request list of messages
     const response = await gapi.client.gmail.users.messages.list({
       userId: 'me',
       maxResults,
       pageToken,
     });
+    
+    // Log response status
+    console.log('Gmail messages list response status:', response.status);
+    
+    if (!response.result) {
+      console.error('No result in Gmail API response');
+      return { messages: [], nextPageToken: undefined };
+    }
+    
+    if (!response.result.messages || response.result.messages.length === 0) {
+      console.log('No Gmail messages found');
+      return { messages: [], nextPageToken: undefined };
+    }
+    
+    console.log(`Found ${response.result.messages.length} Gmail messages`);
+    
+    // Fetch message details for each message ID
+    const messagePromises = response.result.messages.map((message: any) => {
+      console.log(`Fetching details for message ${message.id}...`);
+      return gapi.client.gmail.users.messages.get({
+        userId: 'me',
+        id: message.id,
+        format: 'metadata',
+        metadataHeaders: ['Subject', 'From', 'Date'],
+      });
+    });
 
-    if (response.result.messages && response.result.messages.length > 0) {
-      // Fetch message details for each message ID
-      const messagePromises = response.result.messages.map((message: any) =>
-        gapi.client.gmail.users.messages.get({
-          userId: 'me',
-          id: message.id,
-          format: 'metadata',
-          metadataHeaders: ['Subject', 'From', 'Date'],
-        })
-      );
-
+    try {
       const messageDetails = await Promise.all(messagePromises);
+      console.log(`Successfully fetched details for ${messageDetails.length} messages`);
       
       return {
         messages: messageDetails.map((msg: any) => {
           const { id, threadId, labelIds, payload } = msg.result;
-          const headers = payload?.headers || [];
+          
+          if (!payload || !payload.headers) {
+            console.warn(`Message ${id} has no payload or headers`);
+            return {
+              id,
+              threadId,
+              labelIds,
+              subject: '(No Subject)',
+              from: '',
+              date: '',
+            };
+          }
+          
+          const headers = payload.headers || [];
           
           // Extract relevant headers
           const subject = headers.find((h: any) => h.name === 'Subject')?.value || '(No Subject)';
@@ -109,15 +184,26 @@ export const getGmailMessages = async (maxResults = 15, pageToken?: string) => {
         }),
         nextPageToken: response.result.nextPageToken,
       };
+    } catch (detailsError: any) {
+      console.error('Error fetching message details:', detailsError);
+      throw new Error(`Failed to fetch message details: ${detailsError.message}`);
     }
-    
-    return { messages: [], nextPageToken: undefined };
   } catch (error: any) {
     console.error('Error fetching Gmail messages:', error);
-    // If it's an auth error, provide a more specific message
+    
+    // Provide more detailed error messages based on error type
     if (error.status === 401) {
-      throw new Error('Authentication required to access Gmail');
+      throw new Error('Authentication required to access Gmail. Please log out and log in again.');
+    } else if (error.status === 403) {
+      throw new Error('Permission denied to access Gmail. Make sure to grant appropriate permissions.');
+    } else if (error.status === 404) {
+      throw new Error('Gmail API service not found. This might be a configuration issue.');
+    } else if (error.result && error.result.error) {
+      // Extract the detailed error message from the Google API response
+      throw new Error(`Gmail API error: ${error.result.error.message}`);
     }
+    
+    // Generic error with the original error message
     throw error;
   }
 };
