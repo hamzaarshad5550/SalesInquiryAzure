@@ -128,7 +128,7 @@ export default function Pipeline() {
   const [filterUser, setFilterUser] = useState("all");
   const [sortBy, setSortBy] = useState("updated");
   const [isNewDealDialogOpen, setIsNewDealDialogOpen] = useState(false);
-  const [selectedStageId, setSelectedStageId] = useState<string>("");
+  const [selectedStageId, setSelectedStageId] = useState<number>(0);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -147,7 +147,8 @@ export default function Pipeline() {
       description: "",
       value: 0,
       stageId: selectedStageId,
-      ownerId: "",
+      ownerId: 0,
+      contactId: 1, // Default to first contact
     },
   });
   
@@ -187,13 +188,13 @@ export default function Pipeline() {
   });
   
   // Handle opening the New Deal dialog
-  const handleOpenNewDealDialog = (stageId?: string) => {
+  const handleOpenNewDealDialog = (stageId?: number) => {
     // If a stage ID is provided, pre-select it
     if (stageId) {
       setSelectedStageId(stageId);
     } else {
       // Default to first stage if no stage ID is provided
-      setSelectedStageId(stages.length > 0 ? stages[0].id : "");
+      setSelectedStageId(stages.length > 0 ? Number(stages[0].id) : 0);
     }
     setIsNewDealDialogOpen(true);
   };
@@ -206,8 +207,8 @@ export default function Pipeline() {
 
   const [isDragging, setIsDragging] = useState(false);
   const { mutate: updateDealStage } = useMutation({
-    mutationFn: ({ dealId, stageId }: { dealId: string, stageId: string }) => {
-      return apiRequest("PATCH", `/api/deals/${dealId}/stage`, { stageId });
+    mutationFn: ({ dealId, stageId }: { dealId: string, stageId: number | string }) => {
+      return apiRequest("PATCH", `/api/deals/${dealId}/stage`, { stageId: Number(stageId) });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/pipeline'] });
@@ -404,9 +405,9 @@ export default function Pipeline() {
                     <FormItem>
                       <FormLabel>Stage</FormLabel>
                       <Select
-                        value={field.value}
-                        onValueChange={field.onChange}
-                        defaultValue={selectedStageId}
+                        value={String(field.value)}
+                        onValueChange={(val) => field.onChange(Number(val))}
+                        defaultValue={String(selectedStageId)}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -434,8 +435,8 @@ export default function Pipeline() {
                   <FormItem>
                     <FormLabel>Owner</FormLabel>
                     <Select
-                      value={field.value}
-                      onValueChange={field.onChange}
+                      value={String(field.value)}
+                      onValueChange={(val) => field.onChange(Number(val))}
                     >
                       <FormControl>
                         <SelectTrigger>
