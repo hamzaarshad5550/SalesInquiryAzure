@@ -117,8 +117,9 @@ const dealFormSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   description: z.string().min(5, "Description must be at least 5 characters"),
   value: z.coerce.number().min(0, "Value must be a positive number"),
-  stageId: z.string().min(1, "Stage is required"),
-  ownerId: z.string().min(1, "Owner is required"),
+  stageId: z.coerce.number().int("Stage ID must be an integer"),
+  ownerId: z.coerce.number().int("Owner ID must be an integer"),
+  contactId: z.coerce.number().int().default(1), // Default to first contact until we implement contact selection
 });
 
 type DealFormValues = z.infer<typeof dealFormSchema>;
