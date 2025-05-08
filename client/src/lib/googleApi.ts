@@ -214,10 +214,29 @@ export const getGmailMessages = async (maxResults = 15, pageToken?: string) => {
 export const getCalendarEvents = async (timeMin: string, timeMax: string) => {
   try {
     // Check if API is initialized
-    if (!gapi || !gapi.client || !gapi.client.calendar) {
-      console.error('Calendar API not initialized');
+    if (!gapi) {
+      console.error('Calendar API not initialized - gapi is undefined');
       throw new Error('Calendar API not initialized');
     }
+    
+    if (!gapi.client) {
+      console.error('Calendar API not initialized - gapi.client is undefined');
+      throw new Error('Calendar API client not initialized');
+    }
+    
+    if (!gapi.client.calendar) {
+      console.error('Calendar API not initialized - gapi.client.calendar is undefined');
+      
+      // Check what services are available
+      const availableServices = Object.keys(gapi.client).filter(key => 
+        typeof gapi.client[key] === 'object' && gapi.client[key] !== null
+      );
+      
+      console.error('Available API services:', availableServices);
+      throw new Error('Calendar API service not available');
+    }
+    
+    console.log('Fetching calendar events...');
     
     const response = await gapi.client.calendar.events.list({
       calendarId: 'primary',
@@ -226,14 +245,26 @@ export const getCalendarEvents = async (timeMin: string, timeMax: string) => {
       singleEvents: true,
       orderBy: 'startTime',
     });
-
+    
+    console.log(`Successfully fetched ${response.result.items?.length || 0} calendar events`);
+    
     return response.result.items || [];
   } catch (error: any) {
     console.error('Error fetching calendar events:', error);
-    // If it's an auth error, provide a more specific message
+    
+    // Provide more detailed error messages based on error type
     if (error.status === 401) {
-      throw new Error('Authentication required to access Calendar');
+      throw new Error('Authentication required to access Calendar. Please log out and log in again.');
+    } else if (error.status === 403) {
+      throw new Error('Permission denied to access Calendar. Make sure to grant appropriate permissions.');
+    } else if (error.status === 404) {
+      throw new Error('Calendar API service not found. This might be a configuration issue.');
+    } else if (error.result && error.result.error) {
+      // Extract the detailed error message from the Google API response
+      throw new Error(`Calendar API error: ${error.result.error.message}`);
     }
+    
+    // Generic error with the original error message
     throw error;
   }
 };
@@ -255,10 +286,29 @@ export const getMonthDateRange = (year: number, month: number) => {
 export const getContacts = async (pageSize = 50, pageToken?: string) => {
   try {
     // Check if API is initialized
-    if (!gapi || !gapi.client || !gapi.client.people) {
-      console.error('Contacts API not initialized');
+    if (!gapi) {
+      console.error('Contacts API not initialized - gapi is undefined');
       throw new Error('Contacts API not initialized');
     }
+    
+    if (!gapi.client) {
+      console.error('Contacts API not initialized - gapi.client is undefined');
+      throw new Error('Contacts API client not initialized');
+    }
+    
+    if (!gapi.client.people) {
+      console.error('Contacts API not initialized - gapi.client.people is undefined');
+      
+      // Check what services are available
+      const availableServices = Object.keys(gapi.client).filter(key => 
+        typeof gapi.client[key] === 'object' && gapi.client[key] !== null
+      );
+      
+      console.error('Available API services:', availableServices);
+      throw new Error('People API service not available');
+    }
+    
+    console.log('Fetching Google contacts...');
     
     const response = await gapi.client.people.people.connections.list({
       resourceName: 'people/me',
@@ -267,16 +317,28 @@ export const getContacts = async (pageSize = 50, pageToken?: string) => {
       personFields: 'names,emailAddresses,phoneNumbers',
     });
     
+    console.log(`Successfully fetched ${response.result.connections?.length || 0} contacts`);
+    
     return {
       contacts: response.result.connections || [],
       nextPageToken: response.result.nextPageToken,
     };
   } catch (error: any) {
     console.error('Error fetching contacts:', error);
-    // If it's an auth error, provide a more specific message
+    
+    // Provide more detailed error messages based on error type
     if (error.status === 401) {
-      throw new Error('Authentication required to access Contacts');
+      throw new Error('Authentication required to access Contacts. Please log out and log in again.');
+    } else if (error.status === 403) {
+      throw new Error('Permission denied to access Contacts. Make sure to grant appropriate permissions.');
+    } else if (error.status === 404) {
+      throw new Error('People API service not found. This might be a configuration issue.');
+    } else if (error.result && error.result.error) {
+      // Extract the detailed error message from the Google API response
+      throw new Error(`Contacts API error: ${error.result.error.message}`);
     }
+    
+    // Generic error with the original error message
     throw error;
   }
 };
@@ -287,10 +349,29 @@ export const getContacts = async (pageSize = 50, pageToken?: string) => {
 export const sendEmailReply = async (threadId: string, to: string, subject: string, body: string) => {
   try {
     // Check if API is initialized
-    if (!gapi || !gapi.client || !gapi.client.gmail) {
-      console.error('Gmail API not initialized');
+    if (!gapi) {
+      console.error('Gmail API not initialized - gapi is undefined');
       throw new Error('Gmail API not initialized');
     }
+    
+    if (!gapi.client) {
+      console.error('Gmail API not initialized - gapi.client is undefined');
+      throw new Error('Gmail API client not initialized');
+    }
+    
+    if (!gapi.client.gmail) {
+      console.error('Gmail API not initialized - gapi.client.gmail is undefined');
+      
+      // Check what services are available
+      const availableServices = Object.keys(gapi.client).filter(key => 
+        typeof gapi.client[key] === 'object' && gapi.client[key] !== null
+      );
+      
+      console.error('Available API services:', availableServices);
+      throw new Error('Gmail API service not available');
+    }
+    
+    console.log(`Sending email reply to ${to} with subject: ${subject}`);
     
     // Create the email content
     const emailContent = [
@@ -318,13 +399,25 @@ export const sendEmailReply = async (threadId: string, to: string, subject: stri
       }
     });
     
+    console.log('Successfully sent email reply:', response.result);
+    
     return response.result;
   } catch (error: any) {
     console.error('Error sending email reply:', error);
-    // If it's an auth error, provide a more specific message
+    
+    // Provide more detailed error messages based on error type
     if (error.status === 401) {
-      throw new Error('Authentication required to send emails');
+      throw new Error('Authentication required to send emails. Please log out and log in again.');
+    } else if (error.status === 403) {
+      throw new Error('Permission denied to send emails. Make sure to grant appropriate permissions.');
+    } else if (error.status === 404) {
+      throw new Error('Gmail API service not found. This might be a configuration issue.');
+    } else if (error.result && error.result.error) {
+      // Extract the detailed error message from the Google API response
+      throw new Error(`Gmail API error: ${error.result.error.message}`);
     }
+    
+    // Generic error with the original error message
     throw error;
   }
 };
@@ -335,10 +428,29 @@ export const sendEmailReply = async (threadId: string, to: string, subject: stri
 export const createCalendarEvent = async (summary: string, description: string, start: Date, end: Date, location?: string) => {
   try {
     // Check if API is initialized
-    if (!gapi || !gapi.client || !gapi.client.calendar) {
-      console.error('Calendar API not initialized');
+    if (!gapi) {
+      console.error('Calendar API not initialized - gapi is undefined');
       throw new Error('Calendar API not initialized');
     }
+    
+    if (!gapi.client) {
+      console.error('Calendar API not initialized - gapi.client is undefined');
+      throw new Error('Calendar API client not initialized');
+    }
+    
+    if (!gapi.client.calendar) {
+      console.error('Calendar API not initialized - gapi.client.calendar is undefined');
+      
+      // Check what services are available
+      const availableServices = Object.keys(gapi.client).filter(key => 
+        typeof gapi.client[key] === 'object' && gapi.client[key] !== null
+      );
+      
+      console.error('Available API services:', availableServices);
+      throw new Error('Calendar API service not available');
+    }
+    
+    console.log('Creating new calendar event:', summary);
     
     const event = {
       summary,
@@ -359,13 +471,25 @@ export const createCalendarEvent = async (summary: string, description: string, 
       resource: event
     });
     
+    console.log('Successfully created calendar event:', response.result);
+    
     return response.result;
   } catch (error: any) {
     console.error('Error creating calendar event:', error);
-    // If it's an auth error, provide a more specific message
+    
+    // Provide more detailed error messages based on error type
     if (error.status === 401) {
-      throw new Error('Authentication required to create calendar events');
+      throw new Error('Authentication required to create calendar events. Please log out and log in again.');
+    } else if (error.status === 403) {
+      throw new Error('Permission denied to create calendar events. Make sure to grant appropriate permissions.');
+    } else if (error.status === 404) {
+      throw new Error('Calendar API service not found. This might be a configuration issue.');
+    } else if (error.result && error.result.error) {
+      // Extract the detailed error message from the Google API response
+      throw new Error(`Calendar API error: ${error.result.error.message}`);
     }
+    
+    // Generic error with the original error message
     throw error;
   }
 };
@@ -376,10 +500,29 @@ export const createCalendarEvent = async (summary: string, description: string, 
 export const createContact = async (name: string, email?: string, phone?: string) => {
   try {
     // Check if API is initialized
-    if (!gapi || !gapi.client || !gapi.client.people) {
-      console.error('Contacts API not initialized');
+    if (!gapi) {
+      console.error('Contacts API not initialized - gapi is undefined');
       throw new Error('Contacts API not initialized');
     }
+    
+    if (!gapi.client) {
+      console.error('Contacts API not initialized - gapi.client is undefined');
+      throw new Error('Contacts API client not initialized');
+    }
+    
+    if (!gapi.client.people) {
+      console.error('Contacts API not initialized - gapi.client.people is undefined');
+      
+      // Check what services are available
+      const availableServices = Object.keys(gapi.client).filter(key => 
+        typeof gapi.client[key] === 'object' && gapi.client[key] !== null
+      );
+      
+      console.error('Available API services:', availableServices);
+      throw new Error('People API service not available');
+    }
+    
+    console.log('Creating new contact:', name);
     
     const contactResource = {
       names: [
@@ -407,13 +550,25 @@ export const createContact = async (name: string, email?: string, phone?: string
       resource: contactResource
     });
     
+    console.log('Successfully created contact:', response.result);
+    
     return response.result;
   } catch (error: any) {
     console.error('Error creating contact:', error);
-    // If it's an auth error, provide a more specific message
+    
+    // Provide more detailed error messages based on error type
     if (error.status === 401) {
-      throw new Error('Authentication required to create contacts');
+      throw new Error('Authentication required to create contacts. Please log out and log in again.');
+    } else if (error.status === 403) {
+      throw new Error('Permission denied to create contacts. Make sure to grant appropriate permissions.');
+    } else if (error.status === 404) {
+      throw new Error('People API service not found. This might be a configuration issue.');
+    } else if (error.result && error.result.error) {
+      // Extract the detailed error message from the Google API response
+      throw new Error(`Contacts API error: ${error.result.error.message}`);
     }
+    
+    // Generic error with the original error message
     throw error;
   }
 };
