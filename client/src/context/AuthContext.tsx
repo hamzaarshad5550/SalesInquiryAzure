@@ -9,6 +9,7 @@ interface AuthContextType {
   googleSignIn: () => Promise<User | undefined>;
   logOut: () => Promise<void>;
   isGoogleApiInitialized: boolean;
+  oauthToken: string | null;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -17,6 +18,7 @@ const AuthContext = createContext<AuthContextType>({
   googleSignIn: async () => undefined,
   logOut: async () => {},
   isGoogleApiInitialized: false,
+  oauthToken: null,
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -25,6 +27,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isGoogleApiInitialized, setIsGoogleApiInitialized] = useState(false);
+  const [oauthToken, setOauthToken] = useState<string | null>(null);
 
   // Initialize Google API when user is authenticated
   useEffect(() => {
@@ -55,7 +58,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Sign in with Google
   const googleSignIn = async () => {
     try {
-      const user = await signInWithGoogle();
+      const { user, token } = await signInWithGoogle();
+      if (token) {
+        setOauthToken(token);
+        // Store token in session storage for persistence
+        sessionStorage.setItem('oauthToken', token);
+      }
       return user;
     } catch (error) {
       console.error("Error during Google sign in:", error);
@@ -79,6 +87,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     googleSignIn,
     logOut,
     isGoogleApiInitialized,
+    oauthToken,
   };
 
   return (

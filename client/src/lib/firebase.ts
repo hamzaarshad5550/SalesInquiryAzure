@@ -43,7 +43,7 @@ export const signInWithGoogle = async () => {
     console.log("OAuth Access Token:", token);
     console.log("User Info:", user);
     
-    return user;
+    return { user, token };
   } catch (error) {
     console.error("Error signing in with Google: ", error);
     throw error;
