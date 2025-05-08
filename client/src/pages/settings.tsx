@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import React, { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Card, 
@@ -102,6 +102,7 @@ type TeamFormValues = z.infer<typeof teamFormSchema>;
 export default function Settings() {
   const [activeTab, setActiveTab] = useState("profile");
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   
   // Fetch current user
   const { data: userData, isLoading: isUserLoading } = useQuery({
@@ -117,14 +118,28 @@ export default function Settings() {
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
     defaultValues: {
-      username: userData?.username || "",
-      name: userData?.name || "",
-      email: userData?.email || "",
-      title: userData?.title || "",
-      bio: userData?.bio || "",
-      avatar: userData?.avatarUrl || "",
+      username: "",
+      name: "",
+      email: "",
+      title: "",
+      bio: "",
+      avatar: "",
     }
   });
+  
+  // Update form values when user data is loaded
+  React.useEffect(() => {
+    if (userData) {
+      profileForm.reset({
+        username: userData.username || "",
+        name: userData.name || "",
+        email: userData.email || "",
+        title: userData.title || "",
+        bio: userData.bio || "",
+        avatar: userData.avatarUrl || "",
+      });
+    }
+  }, [userData, profileForm]);
 
   // Security form
   const securityForm = useForm<SecurityFormValues>({
