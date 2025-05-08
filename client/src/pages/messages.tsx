@@ -162,18 +162,18 @@ export default function Messages() {
               <p className="font-medium mb-2">Error loading messages</p>
               <p className="text-sm mb-3">{error}</p>
               
-              {error.includes("Permission denied") && (
+              {(error.includes("Permission denied") || error.includes("disabled") || error.includes("not been used")) && (
                 <div className="bg-amber-50 border border-amber-200 p-3 rounded-md text-amber-800 dark:bg-amber-900/30 dark:border-amber-800 dark:text-amber-300 mt-4 text-sm">
                   <p className="font-medium mb-2">API Services Need to be Enabled</p>
                   <ol className="list-decimal pl-5 space-y-2">
-                    <li>Go to the <a href="https://console.developers.google.com/apis/dashboard" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 underline">Google Cloud Console</a></li>
-                    <li>Select your project (ID: 88311205730)</li>
+                    <li>Go to the <a href="https://console.cloud.google.com/apis/dashboard?project=rayyan-ai" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 underline">Google Cloud Console</a></li>
+                    <li>Select your project "rayyan-ai" (ID: 137346993798)</li>
                     <li>Click on "Enable APIs and Services"</li>
                     <li>Search for and enable each of these APIs:
                       <ul className="list-disc pl-5 mt-1">
-                        <li>Gmail API</li>
-                        <li>Google Calendar API</li>
-                        <li>People API</li>
+                        <li><a href="https://console.cloud.google.com/apis/library/gmail.googleapis.com?project=rayyan-ai" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 underline">Gmail API</a></li>
+                        <li><a href="https://console.cloud.google.com/apis/library/calendar-json.googleapis.com?project=rayyan-ai" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 underline">Google Calendar API</a></li>
+                        <li><a href="https://console.cloud.google.com/apis/library/people.googleapis.com?project=rayyan-ai" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 underline">People API</a></li>
                       </ul>
                     </li>
                     <li>After enabling the APIs, wait a few minutes and try again</li>

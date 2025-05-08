@@ -4,9 +4,9 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/
 // Firebase configuration from environment variables
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: "rayyan-ai-4ef4c.firebaseapp.com", // Use exact domain name without template literals
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: `${import.meta.env.VITE_FIREBASE_PROJECT_ID}.appspot.com`,
+  authDomain: "rayyan-ai.firebaseapp.com", // Updated to match your project ID
+  projectId: "rayyan-ai", // Hardcoded to ensure correct project ID
+  storageBucket: "rayyan-ai.appspot.com",
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
