@@ -18,17 +18,28 @@ export default function Login() {
       await googleSignIn();
       navigate("/dashboard");
     } catch (error: any) {
+      console.error("Google sign in error:", error);
+      
       // Provide a more user-friendly error message based on error code
       if (error.code === 'auth/popup-closed-by-user') {
         setError("Sign-in canceled. Please try again.");
       } else if (error.code === 'auth/unauthorized-domain') {
-        setError("Authentication failed. This domain is not authorized for sign-in.");
+        setError(`Authentication failed: This domain is not authorized for sign-in. Please add ${window.location.origin} to authorized domains in Firebase console.`);
       } else if (error.code === 'auth/popup-blocked') {
         setError("Sign-in popup was blocked by your browser. Please allow popups for this site.");
+      } else if (error.code === 'auth/redirect-cancelled-by-user') {
+        setError("Sign-in was canceled. Please try again.");
+      } else if (error.code === 'auth/redirect-operation-pending') {
+        setError("Another sign-in attempt is in progress. Please wait a moment and try again.");
+      } else if (error.code === 'auth/web-storage-unsupported') {
+        setError("Authentication requires cookies/local storage. Please enable them in your browser settings.");
+      } else if (error.code === 'auth/network-request-failed') {
+        setError("Network error. Please check your internet connection and try again.");
+      } else if (error.message?.includes('redirect_uri_mismatch')) {
+        setError(`Redirect URI mismatch. Please ensure ${window.location.origin} is added to authorized redirect URIs in Firebase console.`);
       } else {
-        setError(error.message || "Failed to sign in with Google. Please try again.");
+        setError(`Authentication error: ${error.message || "Unknown error"}. Please try again.`);
       }
-      console.error("Google sign in error:", error);
     } finally {
       setIsLoading(false);
     }

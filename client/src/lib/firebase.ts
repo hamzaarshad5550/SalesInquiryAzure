@@ -1,24 +1,26 @@
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
 
 // Firebase configuration from environment variables
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: "rayyan-ai.firebaseapp.com", // Updated to match your project ID
-  projectId: "rayyan-ai", // Hardcoded to ensure correct project ID
-  storageBucket: "rayyan-ai.appspot.com",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  apiKey: "AIzaSyB25XShHVczxQQUpiabZM0eYuVcgsmvlUg",
+  authDomain: "rayyan-ai-4ef4c.firebaseapp.com", // Correct domain from the provided info
+  projectId: "rayyan-ai-4ef4c", // Correct project ID from the provided info
+  storageBucket: "rayyan-ai-4ef4c.appspot.com",
+  appId: "1:88311205730:web:996300456c7998e5dbe63b",
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+// Initialize Firebase - prevent duplicate initialization during hot reloading
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
 
 // Set custom parameters for the auth provider
 googleProvider.setCustomParameters({
   prompt: 'select_account',
-  access_type: 'offline' // Request a refresh token
+  access_type: 'offline', // Request a refresh token
+  // Use dynamic redirect detection
+  redirect_uri: window.location.origin
 });
 
 // Add Google OAuth scopes for Gmail, Calendar, and Contacts APIs

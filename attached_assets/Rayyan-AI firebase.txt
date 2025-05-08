@@ -1,0 +1,7 @@
+VITE_FIREBASE_API_KEY = AIzaSyB25XShHVczxQQUpiabZM0eYuVcgsmvlUg
+VITE_FIREBASE_APP_ID = 1:88311205730:web:996300456c7998e5dbe63b
+VITE_FIREBASE_PROJECT_ID = rayyan-ai-4ef4c
+DOMAINs = rayyan-ai-4ef4c.firebaseapp.com and rayyan-ai-4ef4c.web.app
+google cloud API Key = AIzaSyDWQixjQMi_LQ3TiKqI1PyEnrMqt699cQo
+OAuth 2.0 Client IDs = 137346993798-vjsp4l8dlv3klnbke2gedbfj1a4v0ild.apps.googleusercontent.com
+Verify these ids and domain. fix the issue and first check by yourself if everything is fine or not.
