@@ -377,30 +377,10 @@ export const createCalendarEvent = async (summary: string, description: string, 
  */
 export const createContact = async (name: string, email?: string, phone?: string) => {
   try {
-    // Check if API is initialized
-    if (!gapi) {
-      console.error('Contacts API not initialized - gapi is undefined');
-      throw new Error('Contacts API not initialized');
-    }
-    
-    if (!gapi.client) {
-      console.error('Contacts API not initialized - gapi.client is undefined');
-      throw new Error('Contacts API client not initialized');
-    }
-    
-    if (!gapi.client.people) {
-      console.error('Contacts API not initialized - gapi.client.people is undefined');
-      
-      // Check what services are available
-      const availableServices = Object.keys(gapi.client).filter(key => 
-        typeof gapi.client[key] === 'object' && gapi.client[key] !== null
-      );
-      
-      console.error('Available API services:', availableServices);
+    // Simplified API check - only check the final required service
+    if (!gapi?.client?.people) {
       throw new Error('People API service not available');
     }
-    
-    console.log('Creating new contact:', name);
     
     const contactResource = {
       names: [
@@ -427,8 +407,6 @@ export const createContact = async (name: string, email?: string, phone?: string
     const response = await gapi.client.people.people.createContact({
       resource: contactResource
     });
-    
-    console.log('Successfully created contact:', response.result);
     
     return response.result;
   } catch (error: any) {
