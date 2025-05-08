@@ -1,9 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
 
-let app;
-let auth;
-
 // Firebase configuration from environment variables
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -13,16 +10,9 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-// Initialize Firebase if it hasn't been initialized
-if (!app) {
-  try {
-    app = initializeApp(firebaseConfig);
-    auth = getAuth(app);
-  } catch (error) {
-    console.error("Error initializing Firebase:", error);
-  }
-}
-
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
 
 // Add Google OAuth scopes for Gmail, Calendar, and Contacts APIs
@@ -64,4 +54,4 @@ export const signOutUser = async () => {
   }
 };
 
-export { auth, app };
+export { auth };
