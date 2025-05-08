@@ -23,29 +23,53 @@ export default function Messages() {
   const [currentPageToken, setCurrentPageToken] = useState<string | undefined>(undefined);
 
   const fetchEmails = useCallback(async (pageToken?: string) => {
-    if (!isGoogleApiInitialized) {
-      setError("Google API not initialized");
-      setLoading(false);
-      return;
-    }
-
-    if (!oauthToken) {
-      setError("Authentication token missing. Please log in again.");
-      setLoading(false);
-      return;
-    }
-
     setLoading(true);
     setError(null);
-
+    
     try {
+      // Check authentication status
+      if (!currentUser) {
+        setError("You must be logged in to view messages");
+        setLoading(false);
+        return;
+      }
+
+      // Verify Google API initialization
+      if (!isGoogleApiInitialized) {
+        setError("Google API not initialized. Please try logging in again.");
+        setLoading(false);
+        return;
+      }
+
+      // Check for OAuth token
+      if (!oauthToken) {
+        setError("Authentication token missing. Please log in again.");
+        setLoading(false);
+        return;
+      }
+
+      console.log("Fetching Gmail messages...");
+      
+      // Fetch the messages from Gmail API
       const { messages, nextPageToken: newNextPageToken } = await getGmailMessages(15, pageToken);
+      
+      console.log(`Fetched ${messages.length} email messages`);
+      
       setEmails(messages);
       setNextPageToken(newNextPageToken);
       setLoading(false);
     } catch (err: any) {
       console.error("Error fetching emails:", err);
-      setError(err.message || "Failed to fetch emails");
+      
+      // Provide more helpful error messages based on error type
+      if (err.message?.includes("API not initialized")) {
+        setError("Gmail service is not available. Please log out and log in again.");
+      } else if (err.message?.includes("Authentication required")) {
+        setError("Your login session has expired. Please log out and log in again.");
+      } else {
+        setError(err.message || "Failed to fetch emails. Please try again later.");
+      }
+      
       setLoading(false);
     }
   }, [isGoogleApiInitialized, oauthToken]);

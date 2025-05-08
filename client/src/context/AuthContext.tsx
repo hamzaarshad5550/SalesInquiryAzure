@@ -34,7 +34,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Initialize Google API when user is authenticated
   useEffect(() => {
-    if (currentUser) {
+    if (currentUser && oauthToken) {
+      console.log("Attempting to initialize Google API with token");
+      
       initGoogleApi(oauthToken)
         .then(() => {
           setIsGoogleApiInitialized(true);
@@ -42,12 +44,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         })
         .catch((error) => {
           console.error("Failed to initialize Google API:", error);
+          // If initialization fails, try clearing the token and auth state
+          sessionStorage.removeItem('oauthToken');
+          setOauthToken(null);
+          setIsGoogleApiInitialized(false);
         });
     } else {
       setIsGoogleApiInitialized(false);
+      
       // Clear token if user is not authenticated
-      sessionStorage.removeItem('oauthToken');
-      setOauthToken(null);
+      if (!currentUser) {
+        sessionStorage.removeItem('oauthToken');
+        setOauthToken(null);
+      }
     }
   }, [currentUser, oauthToken]);
 

@@ -15,6 +15,12 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
 
+// Set custom parameters for the auth provider
+googleProvider.setCustomParameters({
+  prompt: 'select_account',
+  access_type: 'offline' // Request a refresh token
+});
+
 // Add Google OAuth scopes for Gmail, Calendar, and Contacts APIs
 googleProvider.addScope('https://www.googleapis.com/auth/gmail.readonly');
 googleProvider.addScope('https://www.googleapis.com/auth/gmail.send');
@@ -28,15 +34,31 @@ googleProvider.addScope('https://www.googleapis.com/auth/contacts');
 // Authentication functions
 export const signInWithGoogle = async () => {
   try {
+    // Clear any previous auth state to prevent conflicts
+    if (auth.currentUser) {
+      await signOut(auth);
+    }
+    
+    // Sign in with popup
     const result = await signInWithPopup(auth, googleProvider);
     
     // Extract the OAuth access token
     const credential = GoogleAuthProvider.credentialFromResult(result);
-    const token = credential?.accessToken;
+    
+    if (!credential) {
+      throw new Error("Failed to get authentication credentials");
+    }
+    
+    const token = credential.accessToken;
     const user = result.user;
+    
+    if (!token) {
+      throw new Error("No access token returned from Google authentication");
+    }
     
     // Log success message
     console.log("OAuth Access Token obtained successfully");
+    console.log("Token scopes:", credential.providerId);
     
     return { user, token };
   } catch (error: any) {
@@ -44,8 +66,8 @@ export const signInWithGoogle = async () => {
     console.error("Error signing in with Google: ", {
       code: error.code,
       message: error.message,
-      email: error.email,
-      credential: error.credential
+      email: error.customData?.email,
+      credential: error.customData?.credential
     });
     throw error;
   }
