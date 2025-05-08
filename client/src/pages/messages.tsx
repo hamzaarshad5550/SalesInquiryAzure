@@ -159,8 +159,27 @@ export default function Messages() {
             </div>
           ) : error ? (
             <div className="p-4 bg-red-50 text-red-700 rounded-md dark:bg-red-900/30 dark:text-red-400">
-              <p className="font-medium">Error loading messages</p>
-              <p className="text-sm">{error}</p>
+              <p className="font-medium mb-2">Error loading messages</p>
+              <p className="text-sm mb-3">{error}</p>
+              
+              {error.includes("Permission denied") && (
+                <div className="bg-amber-50 border border-amber-200 p-3 rounded-md text-amber-800 dark:bg-amber-900/30 dark:border-amber-800 dark:text-amber-300 mt-4 text-sm">
+                  <p className="font-medium mb-2">API Services Need to be Enabled</p>
+                  <ol className="list-decimal pl-5 space-y-2">
+                    <li>Go to the <a href="https://console.developers.google.com/apis/dashboard" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 underline">Google Cloud Console</a></li>
+                    <li>Select your project (ID: 88311205730)</li>
+                    <li>Click on "Enable APIs and Services"</li>
+                    <li>Search for and enable each of these APIs:
+                      <ul className="list-disc pl-5 mt-1">
+                        <li>Gmail API</li>
+                        <li>Google Calendar API</li>
+                        <li>People API</li>
+                      </ul>
+                    </li>
+                    <li>After enabling the APIs, wait a few minutes and try again</li>
+                  </ol>
+                </div>
+              )}
             </div>
           ) : emails.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
