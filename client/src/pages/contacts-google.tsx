@@ -50,7 +50,7 @@ interface GoogleContact {
 }
 
 export default function ContactsGoogle() {
-  const { currentUser, isGoogleApiInitialized } = useAuth();
+  const { currentUser, isGoogleApiInitialized, oauthToken } = useAuth();
   const [contacts, setContacts] = useState<GoogleContact[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

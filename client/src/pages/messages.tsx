@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { getGmailMessages } from "../lib/googleApi";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ interface EmailMessage {
 }
 
 export default function Messages() {
-  const { currentUser, isGoogleApiInitialized } = useAuth();
+  const { currentUser, isGoogleApiInitialized, oauthToken } = useAuth();
   const [emails, setEmails] = useState<EmailMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -22,8 +22,16 @@ export default function Messages() {
   const [prevPageTokens, setPrevPageTokens] = useState<string[]>([]);
   const [currentPageToken, setCurrentPageToken] = useState<string | undefined>(undefined);
 
-  const fetchEmails = async (pageToken?: string) => {
+  const fetchEmails = useCallback(async (pageToken?: string) => {
     if (!isGoogleApiInitialized) {
+      setError("Google API not initialized");
+      setLoading(false);
+      return;
+    }
+
+    if (!oauthToken) {
+      setError("Authentication token missing. Please log in again.");
+      setLoading(false);
       return;
     }
 
@@ -40,14 +48,14 @@ export default function Messages() {
       setError(err.message || "Failed to fetch emails");
       setLoading(false);
     }
-  };
+  }, [isGoogleApiInitialized, oauthToken]);
 
-  // Fetch emails when Google API is initialized
+  // Fetch emails when Google API is initialized and we have a valid token
   useEffect(() => {
-    if (isGoogleApiInitialized) {
+    if (isGoogleApiInitialized && oauthToken) {
       fetchEmails();
     }
-  }, [isGoogleApiInitialized]);
+  }, [isGoogleApiInitialized, oauthToken, fetchEmails]);
 
   const handleNextPage = () => {
     if (nextPageToken) {

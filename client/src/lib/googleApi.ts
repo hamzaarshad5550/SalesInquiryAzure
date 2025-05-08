@@ -25,8 +25,9 @@ const SCOPES = [
 
 /**
  * Initialize the Google API client
+ * @param token Optional OAuth token to use for authorization
  */
-export const initGoogleApi = (): Promise<void> => {
+export const initGoogleApi = (token?: string | null): Promise<void> => {
   return new Promise((resolve, reject) => {
     gapi.load('client:auth2', async () => {
       try {
@@ -36,6 +37,12 @@ export const initGoogleApi = (): Promise<void> => {
           discoveryDocs: DISCOVERY_DOCS,
           scope: SCOPES,
         });
+        
+        // If token is provided, set it in the client
+        if (token) {
+          gapi.client.setToken({ access_token: token });
+        }
+        
         resolve();
       } catch (error) {
         console.error('Error initializing Google API client:', error);
