@@ -1,22 +1,28 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
-import { getAnalytics } from "firebase/analytics";
 
-// Your web app's Firebase configuration
+let app;
+let auth;
+
+// Firebase configuration from environment variables
 const firebaseConfig = {
-  apiKey: "AIzaSyB25XShHVczxQQUpiabZM0eYuVcgsmvlUg",
-  authDomain: "rayyan-ai-4ef4c.firebaseapp.com",
-  projectId: "rayyan-ai-4ef4c",
-  storageBucket: "rayyan-ai-4ef4c.firebasestorage.app",
-  messagingSenderId: "88311205730",
-  appId: "1:88311205730:web:996300456c7998e5dbe63b",
-  measurementId: "G-SY0XB69EB4"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: `${import.meta.env.VITE_FIREBASE_PROJECT_ID}.firebaseapp.com`,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: `${import.meta.env.VITE_FIREBASE_PROJECT_ID}.appspot.com`,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
-const auth = getAuth(app);
+// Initialize Firebase if it hasn't been initialized
+if (!app) {
+  try {
+    app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+  } catch (error) {
+    console.error("Error initializing Firebase:", error);
+  }
+}
+
 const googleProvider = new GoogleAuthProvider();
 
 // Add Google OAuth scopes for Gmail, Calendar, and Contacts APIs
@@ -39,9 +45,8 @@ export const signInWithGoogle = async () => {
     const token = credential?.accessToken;
     const user = result.user;
     
-    // Log the token and user info
-    console.log("OAuth Access Token:", token);
-    console.log("User Info:", user);
+    // Log success message
+    console.log("OAuth Access Token obtained successfully");
     
     return { user, token };
   } catch (error) {

@@ -1,9 +1,5 @@
 import { gapi } from 'gapi-script';
 
-// Google API Client ID
-const CLIENT_ID = '137346993798-vjsp4l8dlv3klnbke2gedbfj1a4v0ild.apps.googleusercontent.com';
-const API_KEY = 'AIzaSyDWQixjQMi_LQ3TiKqI1PyEnrMqt699cQo';
-
 // API Discovery URLs
 const DISCOVERY_DOCS = [
   'https://www.googleapis.com/discovery/v1/apis/gmail/v1/rest',
@@ -25,25 +21,25 @@ const SCOPES = [
 
 /**
  * Initialize the Google API client
- * @param token Optional OAuth token to use for authorization
+ * @param token OAuth token to use for authorization
  */
 export const initGoogleApi = (token?: string | null): Promise<void> => {
   return new Promise((resolve, reject) => {
-    gapi.load('client:auth2', async () => {
+    gapi.load('client', async () => {
       try {
+        // Initialize the client without auth first
         await gapi.client.init({
-          apiKey: API_KEY,
-          clientId: CLIENT_ID,
           discoveryDocs: DISCOVERY_DOCS,
-          scope: SCOPES,
         });
         
         // If token is provided, set it in the client
         if (token) {
           gapi.client.setToken({ access_token: token });
+          resolve();
+        } else {
+          console.error('No OAuth token provided for Google API initialization');
+          reject(new Error('No OAuth token provided'));
         }
-        
-        resolve();
       } catch (error) {
         console.error('Error initializing Google API client:', error);
         reject(error);
