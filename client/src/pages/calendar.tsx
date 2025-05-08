@@ -22,7 +22,7 @@ interface CalendarEvent {
 }
 
 export default function Calendar() {
-  const { currentUser, isGoogleApiInitialized } = useAuth();
+  const { currentUser, isGoogleApiInitialized, oauthToken } = useAuth();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -104,6 +104,14 @@ export default function Calendar() {
   // Fetch calendar events when month changes or Google API is initialized
   useEffect(() => {
     if (!isGoogleApiInitialized) {
+      setError("Google API not initialized");
+      setLoading(false);
+      return;
+    }
+    
+    if (!oauthToken) {
+      setError("Authentication token missing. Please log in again.");
+      setLoading(false);
       return;
     }
     
@@ -127,7 +135,7 @@ export default function Calendar() {
     };
     
     fetchEvents();
-  }, [currentDate, isGoogleApiInitialized]);
+  }, [currentDate, isGoogleApiInitialized, oauthToken]);
   
   // Get events for a specific day
   const getEventsForDay = (date: Date): CalendarEvent[] => {

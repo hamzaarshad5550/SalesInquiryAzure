@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { getContacts, createContact } from "../lib/googleApi";
 import { Button } from "@/components/ui/button";
@@ -68,8 +68,16 @@ export default function ContactsGoogle() {
     }
   });
 
-  const fetchContacts = async (pageToken?: string) => {
+  const fetchContacts = useCallback(async (pageToken?: string) => {
     if (!isGoogleApiInitialized) {
+      setError("Google API not initialized");
+      setLoading(false);
+      return;
+    }
+
+    if (!oauthToken) {
+      setError("Authentication token missing. Please log in again.");
+      setLoading(false);
       return;
     }
 
@@ -86,14 +94,14 @@ export default function ContactsGoogle() {
       setError(err.message || "Failed to fetch contacts");
       setLoading(false);
     }
-  };
+  }, [isGoogleApiInitialized, oauthToken]);
 
-  // Fetch contacts when Google API is initialized
+  // Fetch contacts when Google API is initialized and token is available
   useEffect(() => {
-    if (isGoogleApiInitialized) {
+    if (isGoogleApiInitialized && oauthToken) {
       fetchContacts();
     }
-  }, [isGoogleApiInitialized]);
+  }, [isGoogleApiInitialized, oauthToken, fetchContacts]);
 
   const handleNextPage = () => {
     if (nextPageToken) {
@@ -119,6 +127,11 @@ export default function ContactsGoogle() {
   const onSubmit = async (data: ContactFormValues) => {
     if (!isGoogleApiInitialized) {
       setError("Google API not initialized");
+      return;
+    }
+    
+    if (!oauthToken) {
+      setError("Authentication token missing. Please log in again.");
       return;
     }
 
