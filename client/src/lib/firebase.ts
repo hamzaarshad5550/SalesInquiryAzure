@@ -4,7 +4,7 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/
 // Firebase configuration from environment variables
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: `${import.meta.env.VITE_FIREBASE_PROJECT_ID}.firebaseapp.com`,
+  authDomain: "rayyan-ai-4ef4c.firebaseapp.com", // Use exact domain name without template literals
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
   storageBucket: `${import.meta.env.VITE_FIREBASE_PROJECT_ID}.appspot.com`,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
@@ -39,8 +39,14 @@ export const signInWithGoogle = async () => {
     console.log("OAuth Access Token obtained successfully");
     
     return { user, token };
-  } catch (error) {
-    console.error("Error signing in with Google: ", error);
+  } catch (error: any) {
+    // Log detailed error
+    console.error("Error signing in with Google: ", {
+      code: error.code,
+      message: error.message,
+      email: error.email,
+      credential: error.credential
+    });
     throw error;
   }
 };
@@ -48,8 +54,11 @@ export const signInWithGoogle = async () => {
 export const signOutUser = async () => {
   try {
     await signOut(auth);
-  } catch (error) {
-    console.error("Error signing out: ", error);
+  } catch (error: any) {
+    console.error("Error signing out: ", {
+      code: error.code,
+      message: error.message
+    });
     throw error;
   }
 };

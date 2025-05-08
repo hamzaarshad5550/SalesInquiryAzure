@@ -25,6 +25,20 @@ const SCOPES = [
  */
 export const initGoogleApi = (token?: string | null): Promise<void> => {
   return new Promise((resolve, reject) => {
+    // Check if gapi is available
+    if (!gapi) {
+      console.error('Google API client not loaded');
+      reject(new Error('Google API client not loaded'));
+      return;
+    }
+    
+    // First check if token exists
+    if (!token) {
+      console.error('No OAuth token provided for Google API initialization');
+      reject(new Error('No OAuth token provided'));
+      return;
+    }
+    
     gapi.load('client', async () => {
       try {
         // Initialize the client without auth first
@@ -32,14 +46,10 @@ export const initGoogleApi = (token?: string | null): Promise<void> => {
           discoveryDocs: DISCOVERY_DOCS,
         });
         
-        // If token is provided, set it in the client
-        if (token) {
-          gapi.client.setToken({ access_token: token });
-          resolve();
-        } else {
-          console.error('No OAuth token provided for Google API initialization');
-          reject(new Error('No OAuth token provided'));
-        }
+        // Set the token in the client
+        gapi.client.setToken({ access_token: token });
+        console.log('Google API client initialized successfully');
+        resolve();
       } catch (error) {
         console.error('Error initializing Google API client:', error);
         reject(error);
@@ -53,6 +63,12 @@ export const initGoogleApi = (token?: string | null): Promise<void> => {
  */
 export const getGmailMessages = async (maxResults = 15, pageToken?: string) => {
   try {
+    // Check if API is initialized
+    if (!gapi || !gapi.client || !gapi.client.gmail) {
+      console.error('Gmail API not initialized');
+      throw new Error('Gmail API not initialized');
+    }
+    
     const response = await gapi.client.gmail.users.messages.list({
       userId: 'me',
       maxResults,
@@ -75,7 +91,7 @@ export const getGmailMessages = async (maxResults = 15, pageToken?: string) => {
       return {
         messages: messageDetails.map((msg: any) => {
           const { id, threadId, labelIds, payload } = msg.result;
-          const headers = payload.headers || [];
+          const headers = payload?.headers || [];
           
           // Extract relevant headers
           const subject = headers.find((h: any) => h.name === 'Subject')?.value || '(No Subject)';
@@ -96,8 +112,12 @@ export const getGmailMessages = async (maxResults = 15, pageToken?: string) => {
     }
     
     return { messages: [], nextPageToken: undefined };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching Gmail messages:', error);
+    // If it's an auth error, provide a more specific message
+    if (error.status === 401) {
+      throw new Error('Authentication required to access Gmail');
+    }
     throw error;
   }
 };
@@ -107,6 +127,12 @@ export const getGmailMessages = async (maxResults = 15, pageToken?: string) => {
  */
 export const getCalendarEvents = async (timeMin: string, timeMax: string) => {
   try {
+    // Check if API is initialized
+    if (!gapi || !gapi.client || !gapi.client.calendar) {
+      console.error('Calendar API not initialized');
+      throw new Error('Calendar API not initialized');
+    }
+    
     const response = await gapi.client.calendar.events.list({
       calendarId: 'primary',
       timeMin,
@@ -116,8 +142,12 @@ export const getCalendarEvents = async (timeMin: string, timeMax: string) => {
     });
 
     return response.result.items || [];
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching calendar events:', error);
+    // If it's an auth error, provide a more specific message
+    if (error.status === 401) {
+      throw new Error('Authentication required to access Calendar');
+    }
     throw error;
   }
 };

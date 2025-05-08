@@ -1,0 +1,6 @@
+VITE_FIREBASE_API_KEY = AIzaSyB25XShHVczxQQUpiabZM0eYuVcgsmvlUg
+VITE_FIREBASE_APP_ID = 1:88311205730:web:996300456c7998e5dbe63b
+VITE_FIREBASE_PROJECT_ID = rayyan-ai-4ef4c
+DOMAIN = rayyan-ai-4ef4c.firebaseapp.com
+Verify these ids and domain. fix the issue and first check by yourself if everything is fine or not.
+error "Illegal url for new iframe - https://%20rayyan-ai-4ef4c.firebaseapp.com/__/auth/iframe?apiKey=AIzaSyB25XShHVczxQQUpiabZM0eYuVcgsmvlUg&appName=%5BDEFAULT%5D&v=11.7.0&eid=p&usegapi=1&jsh=m%3B%2F_%2Fscs%2Fapps-static%2F_%2Fjs%2Fk%3Doz.gapi.pt_BR.l4Bv_WkVC6g.O%2Fam%3DwQE%2Fd%3D1%2Fct%3Dzgms%2Frs%3DAGLTcCOuH5S2uqmF6E8zOW7n3yiqiwhzNQ%2Fm%3D__features__#id=I4_1746698991850&_gfid=I4_1746698991850&parent=https%3A%2F%2F5beebf47-5bf8-470a-875b-7836a3316bbd-00-2leueosgogedd.janeway.replit.dev&pfname=&rpctoken=16070065"

@@ -18,7 +18,16 @@ export default function Login() {
       await googleSignIn();
       navigate("/dashboard");
     } catch (error: any) {
-      setError(error.message || "Failed to sign in with Google");
+      // Provide a more user-friendly error message based on error code
+      if (error.code === 'auth/popup-closed-by-user') {
+        setError("Sign-in canceled. Please try again.");
+      } else if (error.code === 'auth/unauthorized-domain') {
+        setError("Authentication failed. This domain is not authorized for sign-in.");
+      } else if (error.code === 'auth/popup-blocked') {
+        setError("Sign-in popup was blocked by your browser. Please allow popups for this site.");
+      } else {
+        setError(error.message || "Failed to sign in with Google. Please try again.");
+      }
       console.error("Google sign in error:", error);
     } finally {
       setIsLoading(false);
