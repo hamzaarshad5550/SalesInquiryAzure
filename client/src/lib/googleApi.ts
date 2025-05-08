@@ -168,6 +168,12 @@ export const getMonthDateRange = (year: number, month: number) => {
  */
 export const getContacts = async (pageSize = 50, pageToken?: string) => {
   try {
+    // Check if API is initialized
+    if (!gapi || !gapi.client || !gapi.client.people) {
+      console.error('Contacts API not initialized');
+      throw new Error('Contacts API not initialized');
+    }
+    
     const response = await gapi.client.people.people.connections.list({
       resourceName: 'people/me',
       pageSize,
@@ -179,8 +185,12 @@ export const getContacts = async (pageSize = 50, pageToken?: string) => {
       contacts: response.result.connections || [],
       nextPageToken: response.result.nextPageToken,
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching contacts:', error);
+    // If it's an auth error, provide a more specific message
+    if (error.status === 401) {
+      throw new Error('Authentication required to access Contacts');
+    }
     throw error;
   }
 };
@@ -190,6 +200,12 @@ export const getContacts = async (pageSize = 50, pageToken?: string) => {
  */
 export const sendEmailReply = async (threadId: string, to: string, subject: string, body: string) => {
   try {
+    // Check if API is initialized
+    if (!gapi || !gapi.client || !gapi.client.gmail) {
+      console.error('Gmail API not initialized');
+      throw new Error('Gmail API not initialized');
+    }
+    
     // Create the email content
     const emailContent = [
       `To: ${to}`,
@@ -217,8 +233,12 @@ export const sendEmailReply = async (threadId: string, to: string, subject: stri
     });
     
     return response.result;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error sending email reply:', error);
+    // If it's an auth error, provide a more specific message
+    if (error.status === 401) {
+      throw new Error('Authentication required to send emails');
+    }
     throw error;
   }
 };
@@ -228,6 +248,12 @@ export const sendEmailReply = async (threadId: string, to: string, subject: stri
  */
 export const createCalendarEvent = async (summary: string, description: string, start: Date, end: Date, location?: string) => {
   try {
+    // Check if API is initialized
+    if (!gapi || !gapi.client || !gapi.client.calendar) {
+      console.error('Calendar API not initialized');
+      throw new Error('Calendar API not initialized');
+    }
+    
     const event = {
       summary,
       description,
@@ -248,8 +274,12 @@ export const createCalendarEvent = async (summary: string, description: string, 
     });
     
     return response.result;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating calendar event:', error);
+    // If it's an auth error, provide a more specific message
+    if (error.status === 401) {
+      throw new Error('Authentication required to create calendar events');
+    }
     throw error;
   }
 };
@@ -259,6 +289,12 @@ export const createCalendarEvent = async (summary: string, description: string, 
  */
 export const createContact = async (name: string, email?: string, phone?: string) => {
   try {
+    // Check if API is initialized
+    if (!gapi || !gapi.client || !gapi.client.people) {
+      console.error('Contacts API not initialized');
+      throw new Error('Contacts API not initialized');
+    }
+    
     const contactResource = {
       names: [
         {
@@ -286,8 +322,12 @@ export const createContact = async (name: string, email?: string, phone?: string
     });
     
     return response.result;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating contact:', error);
+    // If it's an auth error, provide a more specific message
+    if (error.status === 401) {
+      throw new Error('Authentication required to create contacts');
+    }
     throw error;
   }
 };
