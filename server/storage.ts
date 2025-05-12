@@ -1,53 +1,74 @@
-import { db } from "@db";
 import { 
-  users, 
-  teams, 
-  userTeams, 
-  contacts, 
-  pipelineStages, 
-  deals, 
-  tasks, 
-  activities,
   type InsertContact,
   type InsertDeal,
   type InsertTask,
   type InsertActivity
 } from "@shared/schema";
-import { eq, desc, and, isNull, asc, sql, like, or, gte, lt, lte, between } from "drizzle-orm";
 import { format, formatISO, subMonths, startOfMonth, endOfMonth, subYears, startOfDay, endOfDay } from "date-fns";
+import { supabase } from "./supabase";
+
+// Create a fallback database implementation using Supabase REST API
+// This avoids the direct PostgreSQL connection that's having DNS resolution issues
+
+// Helper functions for common query patterns
+const handleError = (error: any, operation: string) => {
+  console.error(`Error in ${operation}:`, error);
+  throw new Error(`Failed to execute ${operation}`);
+};
 
 export const storage = {
   /**
    * Gets the current authenticated user (placeholder for auth)
    */
   async getCurrentUser() {
-    const user = await db.query.users.findFirst({
-      where: eq(users.id, 1) // Default to first user for demo
-    });
-    
-    return user;
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', 1) // Default to first user for demo
+        .single();
+      
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      handleError(error, 'getCurrentUser');
+    }
   },
 
   /**
    * Gets all teams
    */
   async getAllTeams() {
-    const allTeams = await db.query.teams.findMany({
-      orderBy: asc(teams.name)
-    });
-    
-    return allTeams;
+    try {
+      const { data, error } = await supabase
+        .from('teams')
+        .select('*')
+        .order('name', { ascending: true });
+      
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      handleError(error, 'getAllTeams');
+      return [];
+    }
   },
 
   /**
    * Gets all users
    */
   async getAllUsers() {
-    const allUsers = await db.query.users.findMany({
-      orderBy: asc(users.name)
-    });
-    
-    return allUsers;
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .order('name', { ascending: true });
+      
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      handleError(error, 'getAllUsers');
+      return [];
+    }
   },
 
   /**

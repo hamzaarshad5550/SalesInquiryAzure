@@ -1,22 +1,14 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
-import { eq, desc, and, isNull, asc, sql } from "drizzle-orm";
+// Import storage from the Supabase implementation instead
+import { storage } from "./storage-supabase";
 import { formatISO, subMonths, startOfMonth, endOfMonth, subYears } from "date-fns";
 import {
-  users,
-  teams,
-  contacts,
-  deals,
-  tasks as tasksTable,
-  activities,
-  pipelineStages,
   insertContactSchema,
   insertDealSchema,
   insertTaskSchema,
   insertActivitySchema,
 } from "@shared/schema";
-import { db } from "@db";
 import { ZodError } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
