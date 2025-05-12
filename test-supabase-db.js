@@ -15,7 +15,7 @@ function formatDatabaseUrl(url) {
 // Construct the Supabase connection string
 const supabasePassword = process.env.SUPABASE_PASSWORD;
 const supabaseConnectionString = 
-  `postgresql://postgres:${supabasePassword}@db.mvmbtxwdovdubcojrwjz.supabase.co:5432/postgres?sslmode=require`;
+  `postgresql://postgres:${supabasePassword}@db.mvmbtxwdovdubcojrwjz.supabase.co:5432/postgres`;
 
 console.log('Testing connection to Supabase database');
 console.log('Connection string (censored):', formatDatabaseUrl(supabaseConnectionString));
