@@ -1,11 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
-const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
   throw new Error("Missing Supabase environment variables");
 }
+
+console.log("Connecting to Supabase at:", supabaseUrl);
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
