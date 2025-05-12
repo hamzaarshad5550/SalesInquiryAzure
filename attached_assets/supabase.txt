@@ -1,0 +1,10 @@
+Supabase:
+Project URL = 
+https://mvmbtxwdovdubcojrwjz.supabase.co
+
+Public API =
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im12bWJ0eHdkb3ZkdWJjb2pyd2p6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY1MTQ1NDMsImV4cCI6MjA2MjA5MDU0M30.YXjE1qf7vDbgSzijgj-7HxxMFAXv0X6xn3PRL4WViMg
+
+
+Database connection string =
+postgresql://postgres:[YOUR-PASSWORD]@db.mvmbtxwdovdubcojrwjz.supabase.co:5432/postgres
