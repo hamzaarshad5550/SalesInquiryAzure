@@ -1,7 +1,8 @@
-const { Pool } = require('pg');
+import pg from 'pg';
+const { Pool } = pg;
 
-// Construct the Supabase connection string
-const supabaseConnectionString = `postgresql://postgres:${process.env.SUPABASE_PASSWORD}@db.mvmbtxwdovdubcojrwjz.supabase.co:5432/postgres`;
+// Try with the main Supabase hostname instead of the db-specific one
+const supabaseConnectionString = `postgresql://postgres:${process.env.SUPABASE_PASSWORD}@mvmbtxwdovdubcojrwjz.supabase.co:5432/postgres`;
 
 console.log('Connecting to Supabase database...');
 console.log('Connection string (without password):', supabaseConnectionString.replace(process.env.SUPABASE_PASSWORD, '[REDACTED]'));
