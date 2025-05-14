@@ -1,12 +1,13 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
-import { supabase } from "./config";
 
 // Initialize connection
-const connectionString = `postgresql://postgres:${process.env.SUPABASE_PASSWORD}@db.mvmbtxwdovdubcojrwjz.supabase.co:5432/postgres`;
-if (!process.env.SUPABASE_PASSWORD) {
-  throw new Error("Missing SUPABASE_PASSWORD environment variable");
+const connectionString = process.env.SUPABASE_POSTGRES_URL || 
+  `postgresql://postgres:${process.env.SUPABASE_PASSWORD}@db.${process.env.SUPABASE_PROJECT_ID}.supabase.co:5432/postgres`;
+
+if (!process.env.SUPABASE_PASSWORD && !process.env.SUPABASE_POSTGRES_URL) {
+  throw new Error("Missing Supabase database connection information");
 }
 
 // For use with migrations and SQL queries

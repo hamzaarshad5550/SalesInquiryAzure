@@ -16,7 +16,7 @@ export default function Login() {
       setError(null);
       setIsLoading(true);
       await googleSignIn();
-      navigate("/dashboard");
+      navigate("/"); // Change from "/dashboard" to "/"
     } catch (error: any) {
       console.error("Google sign in error:", error);
       
