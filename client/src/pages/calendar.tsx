@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { getCalendarEvents, getMonthDateRange } from "../lib/googleApi";
+import { getCalendarEvents, getMonthDateRange, createCalendarEvent } from "../lib/googleApi";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AppointmentForm } from "@/components/AppointmentForm";
+import { useToast } from "@/hooks/use-toast";
 
 interface CalendarEvent {
   id: string;
@@ -21,13 +23,14 @@ interface CalendarEvent {
   location?: string;
 }
 
-export default function Calendar() {
+export default function CalendarPage() {
   const { currentUser, isGoogleApiInitialized, oauthToken } = useAuth();
+  const [currentDate, setCurrentDate] = useState(new Date());
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [calendar, setCalendar] = useState<Array<Array<Date | null>>>([]);
+  const [calendar, setCalendar] = useState<(Date | null)[][]>([]);
+  const [isAppointmentFormOpen, setIsAppointmentFormOpen] = useState(false);
   
   // Format date to display
   const formatMonth = (date: Date) => {
@@ -181,10 +184,46 @@ export default function Calendar() {
   
   return (
     <div className="container mx-auto py-8 px-4">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Calendar</h1>
-        <p className="text-gray-500 dark:text-gray-400">View your Google Calendar events</p>
+      <div className="mb-8 flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">Calendar</h1>
+          <p className="text-gray-500 dark:text-gray-400">View your Google Calendar events</p>
+        </div>
+        
+        <Button 
+          onClick={() => setIsAppointmentFormOpen(true)}
+          className="flex items-center gap-2"
+        >
+          <Plus className="h-4 w-4" />
+          Add Appointment
+        </Button>
       </div>
+      
+      {/* Appointment form dialog */}
+      <AppointmentForm 
+        isOpen={isAppointmentFormOpen}
+        onClose={() => setIsAppointmentFormOpen(false)}
+        onSuccess={() => {
+          // Refresh calendar events after adding a new appointment
+          const fetchEvents = async () => {
+            setLoading(true);
+            try {
+              const { timeMin, timeMax } = getMonthDateRange(
+                currentDate.getFullYear(), 
+                currentDate.getMonth()
+              );
+              const calendarEvents = await getCalendarEvents(timeMin, timeMax);
+              setEvents(calendarEvents);
+            } catch (err: any) {
+              console.error("Error fetching calendar events:", err);
+              setError(err.message || "Failed to fetch calendar events");
+            } finally {
+              setLoading(false);
+            }
+          };
+          fetchEvents();
+        }}
+      />
       
       <Card id="calendarView" className="w-full shadow-md">
         <CardHeader className="flex flex-row items-center justify-between pb-2">

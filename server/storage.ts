@@ -85,31 +85,29 @@ export const storage = {
     const previousMonthEnd = endOfMonth(previousMonth);
     
     // Total revenue from deals that were closed this month
-    const currentMonthRevenue = await db
-      .select({ total: sql<number>`sum(${deals.value})` })
-      .from(deals)
-      .where(
-        and(
-          eq(deals.stageId, 5), // Assuming stage 5 is 'Closed Won'
-          gte(deals.updatedAt, currentMonthStart),
-          lte(deals.updatedAt, currentMonthEnd)
-        )
-      );
+    const { data: currentMonthRevenue, error } = await supabase
+      .from('deals')
+      .select('value')
+      .eq('stage_id', 5) // Assuming stage 5 is 'Closed Won'
+      .gte('updated_at', currentMonthStart.toISOString())
+      .lte('updated_at', currentMonthEnd.toISOString());
+    
+    if (error) throw error;
+    
+    // Calculate sum of values
+    const totalRevenue = currentMonthRevenue?.reduce((sum: number, deal: { value: string | number }) => sum + Number(deal.value), 0) || 0;
     
     // Total revenue from deals that were closed last month
-    const previousMonthRevenue = await db
-      .select({ total: sql<number>`sum(${deals.value})` })
-      .from(deals)
-      .where(
-        and(
-          eq(deals.stageId, 5), // Assuming stage 5 is 'Closed Won'
-          gte(deals.updatedAt, previousMonthStart),
-          lte(deals.updatedAt, previousMonthEnd)
-        )
-      );
+    const { data: previousMonthRevenue, error: previousError } = await supabase
+      .from('deals')
+      .select('value')
+      .eq('stage_id', 5) // Assuming stage 5 is 'Closed Won'
+      .gte('updated_at', previousMonthStart.toISOString())
+      .lte('updated_at', previousMonthEnd.toISOString());
     
-    const totalRevenue = Number(currentMonthRevenue[0]?.total) || 0;
-    const prevTotalRevenue = Number(previousMonthRevenue[0]?.total) || 0;
+    if (previousError) throw previousError;
+    
+    const prevTotalRevenue = previousMonthRevenue?.reduce((sum: number, deal: { value: string | number }) => sum + Number(deal.value), 0) || 0;
     
     // Calculate percent change
     const totalRevenueChange = prevTotalRevenue === 0 
@@ -117,93 +115,72 @@ export const storage = {
       : Number(((totalRevenue - prevTotalRevenue) / prevTotalRevenue * 100).toFixed(1));
     
     // Active deals count
-    const activeDealsCount = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(deals)
-      .where(
-        and(
-          gte(deals.stageId, 1),
-          lt(deals.stageId, 5) // Not including Closed Won or Lost
-        )
-      );
+    const { data: activeDealsCount, error: activeError } = await supabase
+      .from('deals')
+      .select('id')
+      .gte('stage_id', 1)
+      .lt('stage_id', 5); // Not including Closed Won or Lost
+    
+    if (activeError) throw activeError;
+    
+    const activeDeals = activeDealsCount?.length || 0;
     
     // Previous month active deals
-    const prevActiveDealsCount = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(deals)
-      .where(
-        and(
-          gte(deals.stageId, 1),
-          lt(deals.stageId, 5),
-          gte(deals.updatedAt, previousMonthStart),
-          lte(deals.updatedAt, previousMonthEnd)
-        )
-      );
+    const { data: prevActiveDealsCount, error: prevActiveError } = await supabase
+      .from('deals')
+      .select('id')
+      .gte('stage_id', 1)
+      .lt('stage_id', 5)
+      .gte('updated_at', previousMonthStart.toISOString())
+      .lte('updated_at', previousMonthEnd.toISOString());
     
-    const activeDeals = Number(activeDealsCount[0]?.count) || 0;
-    const prevActiveDeals = Number(prevActiveDealsCount[0]?.count) || 0;
+    if (prevActiveError) throw prevActiveError;
+    
+    const prevActiveDeals = prevActiveDealsCount?.length || 0;
     
     const activeDealsChange = prevActiveDeals === 0 
       ? 0 
       : Number(((activeDeals - prevActiveDeals) / prevActiveDeals * 100).toFixed(1));
     
     // Conversion rate (closed won deals / total closed deals)
-    const closedDeals = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(deals)
-      .where(
-        and(
-          gte(deals.updatedAt, currentMonthStart),
-          lte(deals.updatedAt, currentMonthEnd),
-          or(
-            eq(deals.stageId, 5), // Closed Won
-            eq(deals.stageId, 6)  // Closed Lost
-          )
-        )
-      );
+    const { data: closedDeals, error: closedError } = await supabase
+      .from('deals')
+      .select('id')
+      .gte('updated_at', currentMonthStart.toISOString())
+      .lte('updated_at', currentMonthEnd.toISOString())
+      .or('stage_id.eq.5,stage_id.eq.6'); // Closed Won or Closed Lost
     
-    const closedWonDeals = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(deals)
-      .where(
-        and(
-          gte(deals.updatedAt, currentMonthStart),
-          lte(deals.updatedAt, currentMonthEnd),
-          eq(deals.stageId, 5) // Closed Won
-        )
-      );
+    if (closedError) throw closedError;
     
-    // Previous month conversion
-    const prevClosedDeals = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(deals)
-      .where(
-        and(
-          gte(deals.updatedAt, previousMonthStart),
-          lte(deals.updatedAt, previousMonthEnd),
-          or(
-            eq(deals.stageId, 5), // Closed Won
-            eq(deals.stageId, 6)  // Closed Lost
-          )
-        )
-      );
+    const totalClosed = closedDeals?.length || 0;
     
-    const prevClosedWonDeals = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(deals)
-      .where(
-        and(
-          gte(deals.updatedAt, previousMonthStart),
-          lte(deals.updatedAt, previousMonthEnd),
-          eq(deals.stageId, 5) // Closed Won
-        )
-      );
+    const { data: closedWonDeals, error: closedWonError } = await supabase
+      .from('deals')
+      .select('id')
+      .gte('updated_at', currentMonthStart.toISOString())
+      .lte('updated_at', currentMonthEnd.toISOString())
+      .eq('stage_id', 5); // Closed Won
     
-    const totalClosed = Number(closedDeals[0]?.count) || 0;
-    const totalClosedWon = Number(closedWonDeals[0]?.count) || 0;
+    if (closedWonError) throw closedWonError;
     
-    const prevTotalClosed = Number(prevClosedDeals[0]?.count) || 0;
-    const prevTotalClosedWon = Number(prevClosedWonDeals[0]?.count) || 0;
+    const totalClosedWon = closedWonDeals?.length || 0;
+    
+    const prevClosedDeals = await supabase
+      .from('deals')
+      .select('id')
+      .gte('updated_at', previousMonthStart.toISOString())
+      .lte('updated_at', previousMonthEnd.toISOString())
+      .or('stage_id.eq.5,stage_id.eq.6'); // Closed Won or Closed Lost
+    
+    const prevClosedWonDeals = await supabase
+      .from('deals')
+      .select('id')
+      .gte('updated_at', previousMonthStart.toISOString())
+      .lte('updated_at', previousMonthEnd.toISOString())
+      .eq('stage_id', 5); // Closed Won
+    
+    const prevTotalClosed = prevClosedDeals?.length || 0;
+    const prevTotalClosedWon = prevClosedWonDeals?.length || 0;
     
     const conversionRate = totalClosed === 0 
       ? 0 
@@ -218,29 +195,25 @@ export const storage = {
       : Number(((conversionRate - prevConversionRate) / prevConversionRate * 100).toFixed(1));
     
     // New contacts this month
-    const newContacts = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(contacts)
-      .where(
-        and(
-          gte(contacts.createdAt, currentMonthStart),
-          lte(contacts.createdAt, currentMonthEnd)
-        )
-      );
+    const { data: newContacts, error: newContactsError } = await supabase
+      .from('contacts')
+      .select('id')
+      .gte('created_at', currentMonthStart.toISOString())
+      .lte('created_at', currentMonthEnd.toISOString());
     
-    // New contacts last month
-    const prevNewContacts = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(contacts)
-      .where(
-        and(
-          gte(contacts.createdAt, previousMonthStart),
-          lte(contacts.createdAt, previousMonthEnd)
-        )
-      );
+    if (newContactsError) throw newContactsError;
     
-    const newContactsCount = Number(newContacts[0]?.count) || 0;
-    const prevNewContactsCount = Number(prevNewContacts[0]?.count) || 0;
+    const newContactsCount = newContacts?.length || 0;
+    
+    const { data: prevNewContacts, error: prevNewContactsError } = await supabase
+      .from('contacts')
+      .select('id')
+      .gte('created_at', previousMonthStart.toISOString())
+      .lte('created_at', previousMonthEnd.toISOString());
+    
+    if (prevNewContactsError) throw prevNewContactsError;
+    
+    const prevNewContactsCount = prevNewContacts?.length || 0;
     
     const newContactsChange = prevNewContactsCount === 0 
       ? 0 
@@ -272,20 +245,20 @@ export const storage = {
         const monthStart = startOfMonth(monthDate);
         const monthEnd = endOfMonth(monthDate);
         
-        const monthRevenue = await db
-          .select({ total: sql<number>`sum(${deals.value})` })
-          .from(deals)
-          .where(
-            and(
-              eq(deals.stageId, 5), // Closed Won
-              gte(deals.updatedAt, monthStart),
-              lte(deals.updatedAt, monthEnd)
-            )
-          );
+        const { data: monthRevenue, error: monthRevenueError } = await supabase
+          .from('deals')
+          .select('value')
+          .eq('stage_id', 5) // Closed Won
+          .gte('updated_at', monthStart.toISOString())
+          .lte('updated_at', monthEnd.toISOString());
+          
+        if (monthRevenueError) throw monthRevenueError;
+        
+        const totalMonthRevenue = monthRevenue?.reduce((sum: number, deal: { value: string | number }) => sum + Number(deal.value), 0) || 0;
         
         salesData.push({
           name: format(monthDate, 'MMM'),
-          value: Number(monthRevenue[0]?.total) || 0
+          value: totalMonthRevenue
         });
       }
     } else if (period === 'quarterly') {
@@ -298,22 +271,22 @@ export const storage = {
         const quarterStart = startOfMonth(startDate);
         const quarterEnd = endOfMonth(endDate);
         
-        const quarterRevenue = await db
-          .select({ total: sql<number>`sum(${deals.value})` })
-          .from(deals)
-          .where(
-            and(
-              eq(deals.stageId, 5), // Closed Won
-              gte(deals.updatedAt, quarterStart),
-              lte(deals.updatedAt, quarterEnd)
-            )
-          );
+        const { data: quarterRevenue, error: quarterRevenueError } = await supabase
+          .from('deals')
+          .select('value')
+          .eq('stage_id', 5) // Closed Won
+          .gte('updated_at', quarterStart.toISOString())
+          .lte('updated_at', quarterEnd.toISOString());
+          
+        if (quarterRevenueError) throw quarterRevenueError;
+        
+        const totalQuarterRevenue = quarterRevenue?.reduce((sum: number, deal: { value: string | number }) => sum + Number(deal.value), 0) || 0;
         
         const quarterName = `Q${4 - i}`;
         
         salesData.push({
           name: quarterName,
-          value: Number(quarterRevenue[0]?.total) || 0
+          value: totalQuarterRevenue
         });
       }
     } else if (period === 'yearly') {
@@ -323,20 +296,20 @@ export const storage = {
         const yearStart = new Date(yearDate.getFullYear(), 0, 1);
         const yearEnd = new Date(yearDate.getFullYear(), 11, 31);
         
-        const yearRevenue = await db
-          .select({ total: sql<number>`sum(${deals.value})` })
-          .from(deals)
-          .where(
-            and(
-              eq(deals.stageId, 5), // Closed Won
-              gte(deals.updatedAt, yearStart),
-              lte(deals.updatedAt, yearEnd)
-            )
-          );
+        const { data: yearRevenue, error: yearRevenueError } = await supabase
+          .from('deals')
+          .select('value')
+          .eq('stage_id', 5) // Closed Won
+          .gte('updated_at', yearStart.toISOString())
+          .lte('updated_at', yearEnd.toISOString());
+          
+        if (yearRevenueError) throw yearRevenueError;
+        
+        const totalYearRevenue = yearRevenue?.reduce((sum: number, deal: { value: string | number }) => sum + Number(deal.value), 0) || 0;
         
         salesData.push({
           name: format(yearDate, 'yyyy'),
-          value: Number(yearRevenue[0]?.total) || 0
+          value: totalYearRevenue
         });
       }
     }
@@ -348,43 +321,40 @@ export const storage = {
    * Gets pipeline overview data for dashboard
    */
   async getPipelineOverview() {
-    const pipelineData = await db.query.pipelineStages.findMany({
-      orderBy: asc(pipelineStages.order),
-      with: {
-        deals: {
-          orderBy: desc(deals.updatedAt),
-          limit: 5,
-          with: {
-            owner: true
-          }
-        }
-      }
-    });
+    const { data: pipelineData, error } = await supabase
+      .from('pipelineStages')
+      .select('*')
+      .order('order', { ascending: true });
+      
+    if (error) throw error;
     
     // Calculate total value for each stage
     const stagesWithTotals = await Promise.all(
-      pipelineData.map(async (stage) => {
-        const stageDeals = await db
-          .select({ total: sql<number>`sum(${deals.value})` })
-          .from(deals)
-          .where(eq(deals.stageId, stage.id));
+      pipelineData.map(async (stage: { id: number; name: string; color: string; order: number }) => {
+        const stageDeals = await supabase
+          .from('deals')
+          .select('value')
+          .eq('stage_id', stage.id)
+          .order('updated_at', { ascending: false })
+          .limit(5)
+          .single();
         
         return {
           id: stage.id,
           name: stage.name,
           color: stage.color,
           order: stage.order,
-          totalValue: Number(stageDeals[0]?.total) || 0,
-          deals: stage.deals.map(deal => ({
+          totalValue: Number(stageDeals[0]?.value) || 0,
+          deals: stageDeals.map((deal: any) => ({
             id: String(deal.id),
             name: deal.name,
             value: Number(deal.value),
             description: deal.description || "",
-            updatedAt: deal.updatedAt.toISOString(),
+            updatedAt: deal.updated_at.toISOString(),
             owner: {
-              id: String(deal.owner.id),
-              name: deal.owner.name,
-              avatarUrl: deal.owner.avatarUrl
+              id: String(deal.owner_id),
+              name: deal.owner_name,
+              avatarUrl: deal.owner_avatar_url
             }
           }))
         };
@@ -398,63 +368,46 @@ export const storage = {
    * Gets full pipeline with filtering options
    */
   async getPipeline(filterUserId?: number, sortBy: string = 'updated') {
-    const pipelineData = await db.query.pipelineStages.findMany({
-      orderBy: asc(pipelineStages.order)
-    });
+    const pipelineData = await supabase
+      .from('pipelineStages')
+      .select('*')
+      .order('order', { ascending: true });
     
     const stagesWithDeals = await Promise.all(
-      pipelineData.map(async (stage) => {
-        let dealsQuery = db
-          .select()
-          .from(deals)
-          .where(eq(deals.stageId, stage.id))
-          .innerJoin(users, eq(deals.ownerId, users.id));
+      pipelineData.map(async (stage: { id: number; name: string; color: string; order: number }) => {
+        let dealsQuery = supabase
+          .from('deals')
+          .select('*')
+          .eq('stage_id', stage.id);
         
-        // Apply user filter if specified
         if (filterUserId) {
-          dealsQuery = dealsQuery.where(eq(deals.ownerId, filterUserId));
+          dealsQuery = dealsQuery.eq('owner_id', filterUserId);
         }
         
-        // Apply sorting
-        switch (sortBy) {
-          case 'value-desc':
-            dealsQuery = dealsQuery.orderBy(desc(deals.value));
-            break;
-          case 'value-asc':
-            dealsQuery = dealsQuery.orderBy(asc(deals.value));
-            break;
-          case 'name':
-            dealsQuery = dealsQuery.orderBy(asc(deals.name));
-            break;
-          case 'updated':
-          default:
-            dealsQuery = dealsQuery.orderBy(desc(deals.updatedAt));
+        if (sortBy === 'updated') {
+          dealsQuery = dealsQuery.order('updated_at', { ascending: false });
+        } else if (sortBy === 'created') {
+          dealsQuery = dealsQuery.order('created_at', { ascending: false });
+        } else if (sortBy === 'value') {
+          dealsQuery = dealsQuery.order('value', { ascending: false });
         }
         
-        const stageDeals = await dealsQuery;
+        const { data: deals, error } = await dealsQuery;
         
-        // Calculate total value for this stage
-        const stageTotalValue = stageDeals.reduce(
-          (sum, deal) => sum + Number(deal.deals.value), 
-          0
-        );
+        if (error) throw error;
         
         return {
-          id: stage.id,
-          name: stage.name,
-          color: stage.color,
-          order: stage.order,
-          totalValue: stageTotalValue,
-          deals: stageDeals.map(dealData => ({
-            id: String(dealData.deals.id),
-            name: dealData.deals.name,
-            value: Number(dealData.deals.value),
-            description: dealData.deals.description || "",
-            updatedAt: dealData.deals.updatedAt.toISOString(),
+          ...stage,
+          deals: deals.map((deal: any) => ({
+            id: deal.id,
+            name: deal.name,
+            value: deal.value,
+            description: deal.description || "",
+            updatedAt: deal.updated_at.toISOString(),
             owner: {
-              id: String(dealData.users.id),
-              name: dealData.users.name,
-              avatarUrl: dealData.users.avatarUrl
+              id: String(deal.owner_id),
+              name: deal.owner_name,
+              avatarUrl: deal.owner_avatar_url
             }
           }))
         };
@@ -463,276 +416,4 @@ export const storage = {
     
     return stagesWithDeals;
   },
-
-  /**
-   * Gets today's tasks for the current user
-   */
-  async getTodaysTasks() {
-    const today = new Date();
-    const startOfToday = startOfDay(today);
-    const endOfToday = endOfDay(today);
-    
-    const todaysTasks = await db
-      .select()
-      .from(tasks)
-      .where(
-        and(
-          // For demo, get all tasks or tasks assigned to user 1
-          eq(tasks.assignedTo, 1),
-          between(tasks.dueDate, startOfToday, endOfToday)
-        )
-      )
-      .orderBy(asc(tasks.time), asc(tasks.createdAt));
-    
-    return todaysTasks.map(task => ({
-      id: String(task.id),
-      title: task.title,
-      completed: task.completed,
-      dueDate: task.dueDate?.toISOString() || '',
-      time: task.time || '',
-      priority: task.priority
-    }));
-  },
-
-  /**
-   * Toggles a task's completion status
-   */
-  async toggleTaskCompletion(taskId: number) {
-    const task = await db.query.tasks.findFirst({
-      where: eq(tasks.id, taskId)
-    });
-    
-    if (!task) {
-      throw new Error(`Task with ID ${taskId} not found`);
-    }
-    
-    const updatedTask = await db
-      .update(tasks)
-      .set({ 
-        completed: !task.completed,
-        updatedAt: new Date()
-      })
-      .where(eq(tasks.id, taskId))
-      .returning();
-    
-    if (updatedTask.length === 0) {
-      throw new Error(`Failed to update task with ID ${taskId}`);
-    }
-    
-    return updatedTask[0];
-  },
-
-  /**
-   * Gets recent contacts (last added or updated)
-   */
-  async getRecentContacts() {
-    const recentContacts = await db
-      .select()
-      .from(contacts)
-      .orderBy(desc(contacts.updatedAt))
-      .limit(4);
-    
-    return recentContacts.map(contact => ({
-      id: String(contact.id),
-      name: contact.name,
-      email: contact.email,
-      phone: contact.phone || '',
-      title: contact.title || '',
-      company: contact.company || '',
-      avatarUrl: contact.avatarUrl,
-      status: contact.status
-    }));
-  },
-
-  /**
-   * Gets all contacts with optional search
-   */
-  async getContacts(search?: string) {
-    let contactsQuery = db.select().from(contacts);
-    
-    if (search && search.trim() !== '') {
-      const searchTerm = `%${search.trim()}%`;
-      contactsQuery = contactsQuery.where(
-        or(
-          like(contacts.name, searchTerm),
-          like(contacts.email, searchTerm),
-          like(contacts.company, searchTerm),
-          like(contacts.title, searchTerm)
-        )
-      );
-    }
-    
-    const allContacts = await contactsQuery.orderBy(asc(contacts.name));
-    
-    return allContacts.map(contact => ({
-      id: String(contact.id),
-      name: contact.name,
-      email: contact.email,
-      phone: contact.phone || '',
-      title: contact.title || '',
-      company: contact.company || '',
-      avatarUrl: contact.avatarUrl,
-      status: contact.status
-    }));
-  },
-
-  /**
-   * Gets recent activities
-   */
-  async getRecentActivities() {
-    const recentActivities = await db
-      .select()
-      .from(activities)
-      .orderBy(desc(activities.createdAt))
-      .limit(5);
-    
-    return recentActivities.map(activity => ({
-      id: String(activity.id),
-      type: activity.type,
-      title: activity.title,
-      description: activity.description || '',
-      timestamp: activity.createdAt.toISOString()
-    }));
-  },
-
-  /**
-   * Gets a single contact by ID
-   */
-  async getContactById(contactId: number) {
-    const contact = await db.query.contacts.findFirst({
-      where: eq(contacts.id, contactId)
-    });
-    
-    return contact;
-  },
-
-  /**
-   * Creates a new contact
-   */
-  async createContact(contactData: InsertContact) {
-    const newContact = await db
-      .insert(contacts)
-      .values({
-        ...contactData,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      })
-      .returning();
-    
-    return newContact[0];
-  },
-  
-  /**
-   * Updates an existing contact
-   */
-  async updateContact(contactId: number, contactData: Partial<InsertContact>) {
-    // First check if contact exists
-    const existingContact = await db.query.contacts.findFirst({
-      where: eq(contacts.id, contactId)
-    });
-    
-    if (!existingContact) {
-      return null;
-    }
-    
-    // Update the contact
-    const updatedContact = await db
-      .update(contacts)
-      .set({ 
-        ...contactData,
-        updatedAt: new Date()
-      })
-      .where(eq(contacts.id, contactId))
-      .returning();
-    
-    return updatedContact[0];
-  },
-  
-  /**
-   * Deletes a contact
-   */
-  async deleteContact(contactId: number) {
-    // First check if contact exists
-    const existingContact = await db.query.contacts.findFirst({
-      where: eq(contacts.id, contactId)
-    });
-    
-    if (!existingContact) {
-      return false;
-    }
-    
-    // Delete the contact
-    await db
-      .delete(contacts)
-      .where(eq(contacts.id, contactId));
-    
-    return true;
-  },
-
-  /**
-   * Creates a new deal
-   */
-  async createDeal(dealData: InsertDeal) {
-    const newDeal = await db
-      .insert(deals)
-      .values({
-        ...dealData,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      })
-      .returning();
-    
-    return newDeal[0];
-  },
-
-  /**
-   * Updates a deal's stage
-   */
-  async updateDealStage(dealId: number, stageId: number) {
-    const updatedDeal = await db
-      .update(deals)
-      .set({ 
-        stageId: stageId,
-        updatedAt: new Date()
-      })
-      .where(eq(deals.id, dealId))
-      .returning();
-    
-    if (updatedDeal.length === 0) {
-      throw new Error(`Failed to update deal with ID ${dealId}`);
-    }
-    
-    return updatedDeal[0];
-  },
-
-  /**
-   * Creates a new task
-   */
-  async createTask(taskData: InsertTask) {
-    const newTask = await db
-      .insert(tasks)
-      .values({
-        ...taskData,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      })
-      .returning();
-    
-    return newTask[0];
-  },
-
-  /**
-   * Creates a new activity
-   */
-  async createActivity(activityData: InsertActivity) {
-    const newActivity = await db
-      .insert(activities)
-      .values({
-        ...activityData,
-        createdAt: new Date()
-      })
-      .returning();
-    
-    return newActivity[0];
-  }
 };

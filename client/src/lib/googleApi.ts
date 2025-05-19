@@ -373,6 +373,101 @@ export const createCalendarEvent = async (summary: string, description: string, 
 };
 
 /**
+ * Update an existing calendar event
+ */
+export const updateCalendarEvent = async (
+  eventId: string, 
+  summary: string, 
+  description: string, 
+  start: Date, 
+  end: Date, 
+  location?: string
+) => {
+  try {
+    // Simplified API check - only check the final required service
+    if (!gapi?.client?.calendar) {
+      throw new Error('Calendar API service not available');
+    }
+    
+    const event = {
+      summary,
+      description,
+      location,
+      start: {
+        dateTime: start.toISOString(),
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      },
+      end: {
+        dateTime: end.toISOString(),
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      }
+    };
+    
+    const response = await gapi.client.calendar.events.update({
+      calendarId: 'primary',
+      eventId: eventId,
+      resource: event
+    });
+    
+    return response.result;
+  } catch (error: any) {
+    console.error('Error updating calendar event:', error);
+    
+    // Provide more detailed error messages based on error type
+    if (error.status === 401) {
+      throw new Error('Authentication required to update calendar events. Please log out and log in again.');
+    } else if (error.status === 403) {
+      throw new Error('Permission denied to update calendar events. Make sure to grant appropriate permissions.');
+    } else if (error.status === 404) {
+      throw new Error('Calendar event or API service not found. This might be a configuration issue.');
+    } else if (error.result && error.result.error) {
+      // Extract the detailed error message from the Google API response
+      throw new Error(`Calendar API error: ${error.result.error.message}`);
+    }
+    
+    // Generic error with the original error message
+    throw error;
+  }
+};
+
+/**
+ * Delete a calendar event
+ */
+export const deleteCalendarEvent = async (eventId: string) => {
+  try {
+    // Simplified API check - only check the final required service
+    if (!gapi?.client?.calendar) {
+      throw new Error('Calendar API service not available');
+    }
+    
+    const response = await gapi.client.calendar.events.delete({
+      calendarId: 'primary',
+      eventId: eventId
+    });
+    
+    return response.result;
+  } catch (error: any) {
+    console.error('Error deleting calendar event:', error);
+    
+    // Provide more detailed error messages based on error type
+    if (error.status === 401) {
+      throw new Error('Authentication required to delete calendar events. Please log out and log in again.');
+    } else if (error.status === 403) {
+      throw new Error('Permission denied to delete calendar events. Make sure to grant appropriate permissions.');
+    } else if (error.status === 404) {
+      // If the event is not found, consider it already deleted
+      return true;
+    } else if (error.result && error.result.error) {
+      // Extract the detailed error message from the Google API response
+      throw new Error(`Calendar API error: ${error.result.error.message}`);
+    }
+    
+    // Generic error with the original error message
+    throw error;
+  }
+};
+
+/**
  * Create a new contact
  */
 export const createContact = async (name: string, email?: string, phone?: string) => {

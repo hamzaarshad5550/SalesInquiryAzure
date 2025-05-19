@@ -101,14 +101,41 @@ export const tasks = pgTable("tasks", {
   time: text("time"), // e.g. "9:00 AM - 10:00 AM"
   completed: boolean("completed").default(false).notNull(),
   priority: text("priority").default("medium").notNull(), // high, medium, low
-  assignedTo: integer("assigned_to").references(() => users.id).notNull(),
+  assigned_to: integer("assigned_to").references(() => users.id).notNull(), // Changed from assignedTo to assigned_to
   relatedToType: text("related_to_type"), // deal, contact
   relatedToId: integer("related_to_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const insertTaskSchema = createInsertSchema(tasks);
+export const insertTaskSchema = z.object({
+  title: z.string().min(2, "Title must be at least 2 characters"),
+  description: z.string().optional(),
+  // Accept either a string (from form) or a Date object
+  dueDate: z.union([z.string(), z.date()]).optional(),
+  time: z.string().optional(),
+  priority: z.enum(["high", "medium", "low"]),
+  // Accept either assigned_to or assignedTo
+  assigned_to: z.coerce.number().optional(),
+  assignedTo: z.coerce.number().optional(),
+}).transform(data => {
+  // Ensure we have a valid assigned_to value
+  if (data.assigned_to === undefined && data.assignedTo !== undefined) {
+    data.assigned_to = data.assignedTo;
+  } else if (data.assignedTo === undefined && data.assigned_to !== undefined) {
+    data.assignedTo = data.assigned_to;
+  }
+  return data;
+});
+
+export type InsertTask = z.infer<typeof insertTaskSchema>;
+
+export type Task = InsertTask & {
+  id: number;
+  completed: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
 
 // Activities schema
 export const activities = pgTable("activities", {
@@ -160,7 +187,7 @@ export const dealsRelations = relations(deals, ({ one, many }) => ({
 }));
 
 export const tasksRelations = relations(tasks, ({ one }) => ({
-  assignedUser: one(users, { fields: [tasks.assignedTo], references: [users.id], relationName: "assignedTasks" }),
+  assignedUser: one(users, { fields: [tasks.assigned_to], references: [users.id], relationName: "assignedTasks" }), // Changed from tasks.assignedTo to tasks.assigned_to
   deal: one(deals, {
     fields: [tasks.relatedToId],
     references: [deals.id],

@@ -132,12 +132,39 @@ export default function Pipeline() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
+  // Get pipeline data
   const { data, isLoading } = useQuery({
     queryKey: ['/api/pipeline', { user: filterUser, sort: sortBy }],
   });
 
+  // Get users separately to ensure they load properly
+  const { data: usersData } = useQuery({
+    queryKey: ['/api/users'],
+    onError: (error) => {
+      console.error("Error fetching users:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load users. Default owner will be used.",
+        variant: "destructive",
+      });
+    }
+  });
+
   const stages = isLoading ? [] : data?.stages || [];
-  const users = isLoading ? [] : data?.users || [];
+  
+  // Create normalized users array for dropdown
+  const users = usersData?.users || [];
+  console.log("Users data:", users); // Debug log
+  
+  // Default user if none are available
+  const normalizedUsers = users.length > 0 
+    ? users.map(user => ({
+        id: user.id,
+        name: user.name || user.full_name || user.username || user.email || `User ${user.id}`
+      }))
+    : [{ id: 1, name: "Default User" }];
+  
+  console.log("Normalized users:", normalizedUsers); // Debug log
   
   // Create new deal form
   const form = useForm<DealFormValues>({
@@ -444,8 +471,8 @@ export default function Pipeline() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {users.map((user) => (
-                          <SelectItem key={user.id} value={user.id}>
+                        {normalizedUsers.map((user) => (
+                          <SelectItem key={user.id} value={String(user.id)}>
                             {user.name}
                           </SelectItem>
                         ))}

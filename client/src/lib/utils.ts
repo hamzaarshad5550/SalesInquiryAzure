@@ -59,3 +59,60 @@ export function timeAgo(date: Date | string): string {
   const diffInYears = Math.floor(diffInMonths / 12);
   return `${diffInYears} year${diffInYears !== 1 ? 's' : ''} ago`;
 }
+
+/**
+ * Formats a time string to a consistent format (HH:MM AM/PM - HH:MM AM/PM)
+ * @param timeString The time string to format
+ * @returns Formatted time string
+ */
+export function formatTimeString(timeString?: string): string {
+  if (!timeString) return '';
+  
+  // If already in correct format, return as is
+  if (/^\d{1,2}:\d{2}\s*(AM|PM)\s*-\s*\d{1,2}:\d{2}\s*(AM|PM)$/i.test(timeString)) {
+    return timeString;
+  }
+  
+  // If only one time is provided (no range)
+  if (!timeString.includes('-')) {
+    let time = timeString.trim();
+    
+    // Add minutes if only hour is provided
+    if (/^\d{1,2}$/.test(time)) {
+      time = `${time}:00`;
+    }
+    
+    // Add AM/PM if not provided
+    if (/^\d{1,2}:\d{2}$/.test(time)) {
+      const hour = parseInt(time.split(':')[0]);
+      time = `${time} ${hour >= 12 ? 'PM' : 'AM'}`;
+    }
+    
+    return time;
+  }
+  
+  // Handle time range
+  const [start, end] = timeString.split('-').map(t => t.trim());
+  
+  // Format start time
+  let formattedStart = start;
+  if (/^\d{1,2}$/.test(start)) {
+    formattedStart = `${start}:00`;
+  }
+  if (/^\d{1,2}:\d{2}$/.test(formattedStart)) {
+    const hour = parseInt(formattedStart.split(':')[0]);
+    formattedStart = `${formattedStart} ${hour >= 12 ? 'PM' : 'AM'}`;
+  }
+  
+  // Format end time
+  let formattedEnd = end || '';
+  if (/^\d{1,2}$/.test(end)) {
+    formattedEnd = `${end}:00`;
+  }
+  if (/^\d{1,2}:\d{2}$/.test(formattedEnd)) {
+    const hour = parseInt(formattedEnd.split(':')[0]);
+    formattedEnd = `${formattedEnd} ${hour >= 12 ? 'PM' : 'AM'}`;
+  }
+  
+  return formattedEnd ? `${formattedStart} - ${formattedEnd}` : formattedStart;
+}

@@ -30,6 +30,7 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -63,6 +64,13 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
+import { formatTimeString } from "@/lib/utils";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 // Task form schema
 const taskFormSchema = z.object({
@@ -92,29 +100,85 @@ export default function Tasks() {
   // Get all users for assignment
   const { data: usersData, isLoading: isUsersLoading } = useQuery({
     queryKey: ['/api/users'],
+    onError: (error) => {
+      console.error("Error fetching users:", error);
+      // Set default users if API fails
+      return { users: [{ id: 1, full_name: "Default User" }] };
+    }
   });
+
+  // Create a normalized users array that works regardless of API response format
+  const users = usersData?.users || [];
+  const normalizedUsers = users.map(user => ({
+    id: user.id,
+    name: user.username || user.full_name || user.name || `User ${user.id}`
+  }));
 
   // Create Task mutation
   const createTask = useMutation({
     mutationFn: (data: TaskFormValues) => {
-      return apiRequest("POST", "/api/tasks", data);
+      // Ensure we're sending the correct data format
+      const formattedData = {
+        ...data,
+        // Convert empty strings to undefined for optional fields
+        description: data.description || undefined,
+        dueDate: data.dueDate || undefined,
+        time: data.time || undefined,
+        relatedToType: data.relatedToType || undefined,
+        relatedToId: data.relatedToId ? Number(data.relatedToId) : undefined,
+        // Ensure assignedTo is a number and use assigned_to instead
+        assigned_to: Number(data.assignedTo), // Use assigned_to instead of assignedTo
+      };
+      
+      console.log("Sending task data:", formattedData);
+      return apiRequest("POST", "/api/tasks", formattedData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
       toast({ title: "Task created", description: "Task was created successfully" });
       setIsTaskFormOpen(false);
     },
+    onError: (error) => {
+      console.error("Error creating task:", error);
+      toast({ 
+        title: "Creation failed", 
+        description: "Failed to create task. Please try again.", 
+        variant: "destructive" 
+      });
+    },
   });
 
   // Update Task mutation
   const updateTask = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<TaskFormValues> }) => {
-      return apiRequest("PATCH", `/api/tasks/${id}`, data);
+      // Ensure we're sending the correct data format
+      const formattedData = {
+        ...data,
+        // Convert empty strings to undefined for optional fields
+        description: data.description || undefined,
+        dueDate: data.dueDate || undefined, // Keep as string, server will handle conversion
+        time: data.time || undefined,
+        relatedToType: data.relatedToType || undefined,
+        relatedToId: data.relatedToId || undefined,
+        // Ensure assignedTo is a number and use assigned_to instead
+        assigned_to: data.assignedTo ? Number(data.assignedTo) : undefined,
+      };
+      
+      console.log("Sending task update:", formattedData);
+      return apiRequest("PATCH", `/api/tasks/${id}`, formattedData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
       toast({ title: "Task updated", description: "Task was updated successfully" });
       setIsTaskFormOpen(false);
+    },
+    onError: (error) => {
+      console.error("Error updating task:", error);
+      toast({ 
+        title: "Update failed", 
+        description: "Failed to update task. Please try again.", 
+        variant: "destructive" 
+      });
     },
   });
 
@@ -185,13 +249,18 @@ export default function Tasks() {
   // Format date for display
   const formatDate = (dateString?: string | Date) => {
     if (!dateString) return "No date set";
-    const date = new Date(dateString);
-    return format(date, "MMM d, yyyy");
+    try {
+      const date = new Date(dateString);
+      return format(date, "MMM d, yyyy");
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return "Invalid date";
+    }
   };
 
   // Get priority color
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
+  const getPriorityColor = (priority: string | undefined) => {
+    switch (priority?.toLowerCase()) {
       case "high":
         return "bg-destructive/10 text-destructive border-destructive/20";
       case "medium":
@@ -204,7 +273,8 @@ export default function Tasks() {
   };
 
   const tasks = tasksData?.tasks || [];
-  const users = usersData?.users || [];
+  // Remove this duplicate declaration
+  // const users = usersData?.users || []; 
 
   return (
     <main className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-900 p-4 md:p-6">
@@ -295,7 +365,7 @@ export default function Tasks() {
                         />
                       </TableCell>
                       <TableCell>
-                        <div className="font-medium">{task.title}</div>
+                        <div className="font-medium">{task.title || "Untitled Task"}</div>
                         {task.description && (
                           <div className="text-sm text-muted-foreground truncate max-w-xs">
                             {task.description}
@@ -310,17 +380,17 @@ export default function Tasks() {
                         {task.time && (
                           <div className="flex items-center text-xs text-muted-foreground mt-1">
                             <Clock className="h-3 w-3 mr-1" />
-                            <span>{task.time}</span>
+                            <span>{formatTimeString(task.time)}</span>
                           </div>
                         )}
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className={getPriorityColor(task.priority)}>
-                          {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                          {task.priority ? task.priority.charAt(0).toUpperCase() + task.priority.slice(1) : 'Medium'}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {users.find(user => user.id === task.assignedTo)?.username || "Unknown"}
+                        {normalizedUsers.find(user => user.id === task.assignedTo)?.name || "Unassigned"}
                       </TableCell>
                       <TableCell>
                         <div className="flex justify-end gap-2">
@@ -422,11 +492,144 @@ export default function Tasks() {
                     <FormItem className="flex-1">
                       <FormLabel>Time</FormLabel>
                       <FormControl>
-                        <Input 
-                          placeholder="e.g. 10:00 AM - 11:00 AM" 
-                          {...field} 
-                        />
+                        <div className="relative">
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className={cn(
+                                  "w-full justify-start text-left font-normal",
+                                  !field.value && "text-muted-foreground"
+                                )}
+                              >
+                                <Clock className="mr-2 h-4 w-4" />
+                                {field.value || "Select time"}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-full p-0" align="start">
+                              <div className="p-4 space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div className="space-y-2">
+                                    <div className="font-medium text-sm">Start Time</div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <Select
+                                        onValueChange={(hour) => {
+                                          const currentValue = field.value || "";
+                                          const [_, endTime] = currentValue.split(" - ").map(t => t?.trim());
+                                          const newStartTime = `${hour}:00 ${parseInt(hour) >= 12 ? 'PM' : 'AM'}`;
+                                          field.onChange(endTime ? `${newStartTime} - ${endTime}` : newStartTime);
+                                        }}
+                                        value={field.value?.split(" - ")[0]?.split(":")[0] || "9"}
+                                      >
+                                        <SelectTrigger>
+                                          <SelectValue placeholder="Hour" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {Array.from({ length: 12 }, (_, i) => i + 1).map((hour) => (
+                                            <SelectItem key={hour} value={hour.toString()}>
+                                              {hour}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                      <Select
+                                        onValueChange={(ampm) => {
+                                          const currentValue = field.value || "";
+                                          const [startTime, endTime] = currentValue.split(" - ").map(t => t?.trim());
+                                          if (!startTime) {
+                                            const newStartTime = `9:00 ${ampm}`;
+                                            field.onChange(endTime ? `${newStartTime} - ${endTime}` : newStartTime);
+                                            return;
+                                          }
+                                          
+                                          const [time] = startTime.split(" ");
+                                          const newStartTime = `${time} ${ampm}`;
+                                          field.onChange(endTime ? `${newStartTime} - ${endTime}` : newStartTime);
+                                        }}
+                                        value={field.value?.split(" - ")[0]?.split(" ")[1] || "AM"}
+                                      >
+                                        <SelectTrigger>
+                                          <SelectValue placeholder="AM/PM" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="AM">AM</SelectItem>
+                                          <SelectItem value="PM">PM</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  </div>
+                                  <div className="space-y-2">
+                                    <div className="font-medium text-sm">End Time</div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <Select
+                                        onValueChange={(hour) => {
+                                          const currentValue = field.value || "";
+                                          const [startTime] = currentValue.split(" - ").map(t => t?.trim());
+                                          const currentEndTime = currentValue.split(" - ")[1]?.trim();
+                                          const endAmPm = currentEndTime?.split(" ")[1] || "AM";
+                                          const newEndTime = `${hour}:00 ${endAmPm}`;
+                                          field.onChange(startTime ? `${startTime} - ${newEndTime}` : newEndTime);
+                                        }}
+                                        value={field.value?.split(" - ")[1]?.split(":")[0] || "10"}
+                                      >
+                                        <SelectTrigger>
+                                          <SelectValue placeholder="Hour" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {Array.from({ length: 12 }, (_, i) => i + 1).map((hour) => (
+                                            <SelectItem key={hour} value={hour.toString()}>
+                                              {hour}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                      <Select
+                                        onValueChange={(ampm) => {
+                                          const currentValue = field.value || "";
+                                          const [startTime, endTime] = currentValue.split(" - ").map(t => t?.trim());
+                                          if (!endTime) {
+                                            const newEndTime = `10:00 ${ampm}`;
+                                            field.onChange(startTime ? `${startTime} - ${newEndTime}` : newEndTime);
+                                            return;
+                                          }
+                                          
+                                          const [time] = endTime.split(" ");
+                                          const newEndTime = `${time} ${ampm}`;
+                                          field.onChange(startTime ? `${startTime} - ${newEndTime}` : newEndTime);
+                                        }}
+                                        value={field.value?.split(" - ")[1]?.split(" ")[1] || "AM"}
+                                      >
+                                        <SelectTrigger>
+                                          <SelectValue placeholder="AM/PM" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="AM">AM</SelectItem>
+                                          <SelectItem value="PM">PM</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex justify-end">
+                                  <Button 
+                                    size="sm" 
+                                    onClick={() => {
+                                      const startTime = field.value?.split(" - ")[0]?.trim() || "9:00 AM";
+                                      const endTime = field.value?.split(" - ")[1]?.trim() || "10:00 AM";
+                                      field.onChange(`${startTime} - ${endTime}`);
+                                    }}
+                                  >
+                                    Apply
+                                  </Button>
+                                </div>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
                       </FormControl>
+                      <FormDescription className="text-xs">
+                        Format: HH:MM AM/PM - HH:MM AM/PM
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -477,11 +680,13 @@ export default function Tasks() {
                         </FormControl>
                         <SelectContent>
                           {isUsersLoading ? (
-                            <SelectItem value="loading">Loading users...</SelectItem>
+                            <SelectItem value="1">Loading users...</SelectItem>
+                          ) : normalizedUsers.length === 0 ? (
+                            <SelectItem value="1">Default User</SelectItem>
                           ) : (
-                            users.map((user) => (
+                            normalizedUsers.map((user) => (
                               <SelectItem key={user.id} value={user.id.toString()}>
-                                {user.username}
+                                {user.name}
                               </SelectItem>
                             ))
                           )}

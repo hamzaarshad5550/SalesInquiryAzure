@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -102,7 +103,7 @@
   }
   
   * {
-    @apply border-border;
+    border-color: hsl(var(--border));
   }
   
   body {

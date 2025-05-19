@@ -12,3 +12,16 @@ git commit -m "Initial commit"
 
 # Push to GitHub
 git push -u origin main
+
+# If you get an error about the branch name, try:
+# git push -u origin master
+
+# If you need to force push (use with caution):
+# git push -f origin main
+
+# If you need to create a new branch:
+# git checkout -b main
+# git push -u origin main
+
+# If you need to pull changes first:
+# git pull origin main --allow-unrelated-histories

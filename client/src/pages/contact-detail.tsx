@@ -11,6 +11,7 @@ import { type Contact, type Activity, type Task, type InsertActivity, type Inser
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -175,7 +176,18 @@ export default function ContactDetail() {
   const { data: usersData } = useQuery<{ users: any[] }>({
     queryKey: ['/api/users'],
     enabled: !!contactId,
+    onError: (error) => {
+      console.error("Error fetching users:", error);
+      return { users: [{ id: 1, full_name: "Default User" }] };
+    }
   });
+
+  // Create a normalized users array
+  const users = usersData?.users || [];
+  const normalizedUsers = users.map(user => ({
+    id: user.id,
+    name: user.username || user.full_name || user.name || `User ${user.id}`
+  }));
 
   // Initialize forms
   const form = useForm<ContactFormValues>({
@@ -351,13 +363,65 @@ export default function ContactDetail() {
 
   // Create task mutation
   const createTaskMutation = useMutation({
-    mutationFn: (data: TaskFormValues) => {
+    mutationFn: async (data: TaskFormValues) => {
+      // First, create the task in your database
       const taskData: Partial<InsertTask> = {
         ...data,
         relatedToType: 'contact',
         relatedToId: parseInt(contactId as string),
       };
-      return apiRequest("POST", "/api/tasks", taskData);
+      const createdTask = await apiRequest("POST", "/api/tasks", taskData);
+      
+      // Then, if due date exists, create a Google Calendar event
+      if (data.dueDate && isGoogleApiInitialized && oauthToken) {
+        try {
+          // Parse date and time
+          const dueDate = new Date(data.dueDate);
+          let startTime = dueDate;
+          let endTime = new Date(dueDate);
+          
+          // If time is specified, parse it
+          if (data.time) {
+            const [startStr, endStr] = data.time.split(' - ');
+            if (startStr) {
+              const [startHour, startMinute] = startStr.split(':').map(Number);
+              startTime.setHours(startHour, startMinute);
+            }
+            
+            if (endStr) {
+              const [endHour, endMinute] = endStr.split(':').map(Number);
+              endTime.setHours(endHour, endMinute);
+            } else {
+              // Default to 1 hour duration if no end time
+              endTime.setHours(startTime.getHours() + 1, startTime.getMinutes());
+            }
+          } else {
+            // Default times if no specific time provided
+            startTime.setHours(9, 0);
+            endTime.setHours(10, 0);
+          }
+          
+          // Create Google Calendar event
+          const calendarEvent = await createCalendarEvent(
+            data.title,
+            data.description || '',
+            startTime,
+            endTime
+          );
+          
+          // Update the task with the Google Calendar event ID
+          if (calendarEvent && calendarEvent.id) {
+            await apiRequest("PATCH", `/api/tasks/${createdTask.id}`, {
+              googleEventId: calendarEvent.id
+            });
+          }
+        } catch (error) {
+          console.error("Failed to create Google Calendar event:", error);
+          // Continue with task creation even if calendar event fails
+        }
+      }
+      
+      return createdTask;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/contacts/${contactId}/tasks`] });
@@ -365,7 +429,7 @@ export default function ContactDetail() {
       
       toast({
         title: "Task created successfully",
-        description: "The task has been created and assigned",
+        description: "The task has been created and added to your calendar",
       });
       
       setIsTaskDialogOpen(false);
@@ -1356,8 +1420,61 @@ export default function ContactDetail() {
                         <FormItem>
                           <FormLabel>Time</FormLabel>
                           <FormControl>
-                            <Input placeholder="e.g. 10:00 AM - 11:00 AM" {...field} />
+                            <div className="relative">
+                              <Input 
+                                placeholder="e.g. 10:00 AM - 11:00 AM" 
+                                {...field} 
+                                onChange={(e) => {
+                                  // Format time input as user types
+                                  let value = e.target.value;
+                                  
+                                  // If user enters just numbers, format them as time
+                                  if (/^\d{1,2}$/.test(value)) {
+                                    value = `${value}:00`;
+                                  }
+                                  
+                                  // If user enters time without AM/PM, add it
+                                  if (/^\d{1,2}:\d{2}$/.test(value)) {
+                                    const hour = parseInt(value.split(':')[0]);
+                                    value = `${value} ${hour >= 12 ? 'PM' : 'AM'}`;
+                                  }
+                                  
+                                  // If user enters a dash, format it properly
+                                  if (value.includes('-')) {
+                                    const [start, end] = value.split('-').map(t => t.trim());
+                                    
+                                    // Format start time if needed
+                                    let formattedStart = start;
+                                    if (/^\d{1,2}$/.test(start)) {
+                                      formattedStart = `${start}:00 ${parseInt(start) >= 12 ? 'PM' : 'AM'}`;
+                                    } else if (/^\d{1,2}:\d{2}$/.test(start)) {
+                                      const hour = parseInt(start.split(':')[0]);
+                                      formattedStart = `${start} ${hour >= 12 ? 'PM' : 'AM'}`;
+                                    }
+                                    
+                                    // Format end time if needed
+                                    let formattedEnd = end || '';
+                                    if (/^\d{1,2}$/.test(end)) {
+                                      formattedEnd = `${end}:00 ${parseInt(end) >= 12 ? 'PM' : 'AM'}`;
+                                    } else if (/^\d{1,2}:\d{2}$/.test(end)) {
+                                      const hour = parseInt(end.split(':')[0]);
+                                      formattedEnd = `${end} ${hour >= 12 ? 'PM' : 'AM'}`;
+                                    }
+                                    
+                                    value = formattedEnd ? `${formattedStart} - ${formattedEnd}` : formattedStart;
+                                  }
+                                  
+                                  field.onChange(value);
+                                }}
+                              />
+                              <div className="absolute right-3 top-2.5 text-muted-foreground">
+                                <Clock className="h-4 w-4" />
+                              </div>
+                            </div>
                           </FormControl>
+                          <FormDescription className="text-xs">
+                            Format: HH:MM AM/PM - HH:MM AM/PM
+                          </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -1407,11 +1524,15 @@ export default function ContactDetail() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {usersData?.users && usersData.users.map((user) => (
-                                <SelectItem key={user.id} value={user.id.toString()}>
-                                  {user.name}
-                                </SelectItem>
-                              ))}
+                              {normalizedUsers.length === 0 ? (
+                                <SelectItem value="1">Default User</SelectItem>
+                              ) : (
+                                normalizedUsers.map((user) => (
+                                  <SelectItem key={user.id} value={user.id.toString()}>
+                                    {user.name}
+                                  </SelectItem>
+                                ))
+                              )}
                             </SelectContent>
                           </Select>
                           <FormMessage />

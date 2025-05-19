@@ -1,5 +1,5 @@
 import { Pool } from 'pg';
-import { drizzle } from 'drizzle-orm/node-postgres';
+import { drizzle } from 'drizzle-orm/node-postgres'; // Use the node-postgres adapter
 import * as schema from "@shared/schema";
 
 // Construct Supabase connection string or fallback to DATABASE_URL
