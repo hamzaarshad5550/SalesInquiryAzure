@@ -179,6 +179,103 @@ export const getGmailMessages = async (maxResults = 15, pageToken?: string) => {
 };
 
 /**
+ * Get detailed information for a specific Gmail message
+ */
+export const getGmailMessageDetail = async (messageId: string) => {
+  try {
+    // Check if Gmail API is available
+    if (!gapi?.client?.gmail) {
+      throw new Error('Gmail API service not available');
+    }
+    
+    // Get the full message details
+    const response = await gapi.client.gmail.users.messages.get({
+      userId: 'me',
+      id: messageId,
+      format: 'full'
+    });
+    
+    if (!response.result) {
+      throw new Error('Failed to retrieve message details');
+    }
+    
+    const message = response.result;
+    
+    // Extract headers
+    const headers = message.payload.headers;
+    const subject = headers.find(h => h.name === 'Subject')?.value || '';
+    const from = headers.find(h => h.name === 'From')?.value || '';
+    const to = headers.find(h => h.name === 'To')?.value || '';
+    const date = headers.find(h => h.name === 'Date')?.value || '';
+    
+    // Extract body content
+    let body = '';
+    
+    // Function to extract body from parts recursively
+    const extractBody = (part: any) => {
+      if (part.body.data) {
+        // Base64 decode the body data
+        const decodedBody = atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+        if (part.mimeType === 'text/html') {
+          body = decodedBody;
+          return true;
+        } else if (part.mimeType === 'text/plain' && !body) {
+          body = `<pre>${decodedBody}</pre>`;
+          return false; // Continue looking for HTML
+        }
+      }
+      
+      if (part.parts) {
+        for (const subPart of part.parts) {
+          if (extractBody(subPart)) {
+            return true;
+          }
+        }
+      }
+      
+      return false;
+    };
+    
+    // Try to extract body from the message payload
+    if (message.payload.body && message.payload.body.data) {
+      const decodedBody = atob(message.payload.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+      if (message.payload.mimeType === 'text/html') {
+        body = decodedBody;
+      } else {
+        body = `<pre>${decodedBody}</pre>`;
+      }
+    } else if (message.payload.parts) {
+      extractBody(message.payload);
+    }
+    
+    return {
+      id: message.id,
+      threadId: message.threadId,
+      subject,
+      from,
+      to,
+      date,
+      body
+    };
+  } catch (error: any) {
+    console.error('Error fetching email details:', error);
+    
+    // Provide more detailed error messages
+    if (error.status === 401) {
+      throw new Error('Authentication required to access email details. Please log out and log in again.');
+    } else if (error.status === 403) {
+      throw new Error('Permission denied to access email details. Make sure to grant appropriate permissions.');
+    } else if (error.status === 404) {
+      throw new Error('Email not found. It may have been deleted or moved.');
+    } else if (error.result && error.result.error) {
+      throw new Error(`Gmail API error: ${error.result.error.message}`);
+    }
+    
+    throw new Error('Failed to load email details. Please try again later.');
+  }
+};
+
+/**
  * Get calendar events for a specified date range
  */
 export const getCalendarEvents = async (timeMin: string, timeMax: string) => {
@@ -275,6 +372,8 @@ export const sendEmailReply = async (threadId: string, to: string, subject: stri
       throw new Error('Gmail API service not available');
     }
     
+    console.log('Sending email reply:', { threadId, to, subject });
+    
     // Create the email content
     const emailContent = [
       `To: ${to}`,
@@ -286,7 +385,7 @@ export const sendEmailReply = async (threadId: string, to: string, subject: stri
     ].join('\r\n');
     
     // Encode the email to base64url format
-    const encodedEmail = btoa(emailContent)
+    const encodedEmail = btoa(unescape(encodeURIComponent(emailContent)))
       .replace(/\+/g, '-')
       .replace(/\//g, '_')
       .replace(/=+$/, '');
@@ -294,13 +393,13 @@ export const sendEmailReply = async (threadId: string, to: string, subject: stri
     // Send the email
     const response = await gapi.client.gmail.users.messages.send({
       userId: 'me',
-      threadId,
       resource: {
         raw: encodedEmail,
         threadId
       }
     });
     
+    console.log('Email reply sent successfully:', response.result);
     return response.result;
   } catch (error: any) {
     console.error('Error sending email reply:', error);
@@ -315,10 +414,12 @@ export const sendEmailReply = async (threadId: string, to: string, subject: stri
     } else if (error.result && error.result.error) {
       // Extract the detailed error message from the Google API response
       throw new Error(`Gmail API error: ${error.result.error.message}`);
+    } else if (error.message) {
+      throw new Error(`Failed to send email: ${error.message}`);
     }
     
     // Generic error with the original error message
-    throw error;
+    throw new Error('Failed to send email. Please try again later.');
   }
 };
 

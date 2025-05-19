@@ -106,20 +106,63 @@
     border-color: hsl(var(--border));
   }
   
+  html, body {
+    height: 100%;
+    overflow-x: hidden;
+  }
+
   body {
     @apply font-sans antialiased bg-background text-foreground;
+    display: flex;
+    flex-direction: column;
   }
-  
+
+  #root {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+
+  /* Ensure email content doesn't overflow */
+  .break-words {
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
-  
+
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
-  
+
   .pipeline-column {
     min-width: 280px;
+  }
+
+  /* Email-specific styles */
+  .email-subject {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .email-from {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Responsive adjustments */
+  @media (max-width: 640px) {
+    .email-list-container {
+      height: calc(100vh - 220px);
+    }
   }
 }
