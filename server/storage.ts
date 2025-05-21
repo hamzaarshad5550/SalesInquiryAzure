@@ -378,7 +378,7 @@ export const storage = {
         let dealsQuery = supabase
           .from('deals')
           .select('*')
-          .eq('stage_id', stage.id);
+          .eq('stage', stage.id);  // Changed from 'stage_id' to 'stage'
         
         if (filterUserId) {
           dealsQuery = dealsQuery.eq('owner_id', filterUserId);

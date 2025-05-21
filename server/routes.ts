@@ -114,7 +114,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Full Pipeline
   app.get(`${apiPrefix}/pipeline`, async (req, res) => {
     try {
-      const stages = await storage.getPipelineStages();
+      // Get pipeline stages directly from storage
+      const stages = await storage.getPipeline();
       
       // Get users separately
       let users = [];
@@ -132,7 +133,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Error fetching pipeline data:", error);
-      res.status(500).json({ message: "Failed to fetch pipeline data" });
+      res.status(500).json({ 
+        message: "Failed to fetch pipeline data",
+        stages: [
+          {
+            id: 1,
+            name: "Lead",
+            color: "#6366F1",
+            order: 1,
+            deals: []
+          },
+          {
+            id: 2,
+            name: "Qualified",
+            color: "#8B5CF6",
+            order: 2,
+            deals: []
+          },
+          {
+            id: 3,
+            name: "Proposal",
+            color: "#EC4899",
+            order: 3,
+            deals: []
+          },
+          {
+            id: 4,
+            name: "Negotiation",
+            color: "#F59E0B",
+            order: 4,
+            deals: []
+          },
+          {
+            id: 5,
+            name: "Closed Won",
+            color: "#10B981",
+            order: 5,
+            deals: []
+          }
+        ],
+        users: [{ id: 1, name: "Default User" }]
+      });
     }
   });
 
@@ -358,8 +399,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create new deal
   app.post(`${apiPrefix}/deals`, async (req, res) => {
     try {
+      // Validate the incoming data with the schema
       const dealData = insertDealSchema.parse(req.body);
-      const newDeal = await storage.createDeal(dealData);
+      
+      // Transform camelCase to snake_case for Supabase
+      const transformedData = {
+        name: dealData.name,
+        description: dealData.description,
+        value: dealData.value,
+        stage_id: dealData.stageId,
+        contact_id: dealData.contactId,
+        owner_id: dealData.ownerId,
+        probability: dealData.probability,
+        expected_close_date: dealData.expectedCloseDate,
+      };
+      
+      console.log("Transformed deal data for Supabase:", transformedData);
+      
+      const newDeal = await storage.createDeal(transformedData);
+      res.status(201).json(newDeal);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        res.status(400).json({ message: "Invalid deal data", errors: error.errors });
+      } else {
+        console.error("Error creating deal:", error);
+        res.status(500).json({ message: "Failed to create deal" });
+      }
+    }
+  });
+
+  // Alternative endpoint for creating deals with proper transformation
+  app.post(`${apiPrefix}/deals/create`, async (req, res) => {
+    try {
+      // Validate the incoming data with the schema
+      const dealData = insertDealSchema.parse(req.body);
+      
+      // Transform camelCase to snake_case for Supabase
+      const transformedData = {
+        name: dealData.name,
+        description: dealData.description,
+        value: dealData.value,
+        stage_id: dealData.stageId,
+        contact_id: dealData.contactId,
+        owner_id: dealData.ownerId,
+        probability: dealData.probability,
+        expected_close_date: dealData.expectedCloseDate,
+      };
+      
+      console.log("Transformed deal data for Supabase:", transformedData);
+      
+      const newDeal = await storage.createDeal(transformedData);
       res.status(201).json(newDeal);
     } catch (error) {
       if (error instanceof ZodError) {

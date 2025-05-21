@@ -128,9 +128,7 @@ export const insertTaskSchema = z.object({
   return data;
 });
 
-export type InsertTask = z.infer<typeof insertTaskSchema>;
-
-export type Task = InsertTask & {
+export type InsertTaskWithId = InsertTask & {
   id: number;
   completed: boolean;
   createdAt: string;

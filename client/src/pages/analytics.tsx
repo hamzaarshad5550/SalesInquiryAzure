@@ -1,24 +1,7 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
-  CardTitle 
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
+import { useState, useEffect } from "react";
+import { useQuery, QueryClient } from "@tanstack/react-query";
 import { 
   ResponsiveContainer, 
-  BarChart, 
-  Bar, 
   LineChart, 
   Line, 
   XAxis, 
@@ -26,10 +9,28 @@ import {
   CartesianGrid, 
   Tooltip, 
   Legend,
+  BarChart,
+  Bar,
+  Cell,
   PieChart,
-  Pie,
-  Cell
+  Pie
 } from "recharts";
+import { Button } from "@/components/ui/button";
+import { 
+  Card, 
+  CardContent, 
+  CardDescription, 
+  CardHeader, 
+  CardTitle, 
+  CardFooter
+} from "@/components/ui/card";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { 
@@ -39,9 +40,19 @@ import {
   Download,
   Calendar,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  Activity,
+  RefreshCw
 } from "lucide-react";
 import { formatCurrency, formatPercentage } from "@/lib/utils";
+import { SalesProbabilityChart } from "@/components/analytics/sales-probability-chart";
+import { ConversionFunnel } from "@/components/analytics/conversion-funnel";
+import { DealVelocity } from "@/components/analytics/deal-velocity";
+import { supabase } from "@/lib/supabase";
+import { format } from "date-fns";
+
+// Create a QueryClient instance
+const queryClient = new QueryClient();
 
 // Color constants for charts
 const COLORS = [
@@ -52,119 +63,407 @@ const COLORS = [
   "hsl(var(--success))"
 ];
 
-// Types for the analytics data
-type SalesPerformance = {
-  name: string;
-  current: number;
-  previous: number;
-};
-
-type DealsByStage = {
-  name: string;
-  value: number;
-  color: string;
-}
-
-type LeadSource = {
-  name: string;
-  value: number;
-  color: string;
-}
-
-type TopSalesPerson = {
-  id: number;
-  name: string;
-  deals: number;
-  revenue: number;
-}
-
-type MetricTile = {
-  title: string;
-  value: number | string;
-  change: number;
-  changeType: "increase" | "decrease";
-  format: "currency" | "percentage" | "number";
-}
-
 export default function Analytics() {
   const [timeRange, setTimeRange] = useState<string>("monthly");
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
   
-  // Fetch analytics data from API
-  const { data: salesPerformanceData, isLoading: isSalesPerformanceLoading } = useQuery({
-    queryKey: ['/api/dashboard/sales-performance', { period: timeRange }],
-  });
+  // Set up real-time listeners
+  useEffect(() => {
+    // Subscribe to changes in deals table
+    const dealsSubscription = supabase
+      .channel('deals-changes')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'deals' 
+      }, () => {
+        // Invalidate relevant queries when data changes
+        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/metrics'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/sales-performance'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/deals-by-stage'] });
+        setLastUpdated(new Date());
+      })
+      .subscribe();
+      
+    // Subscribe to changes in contacts table for lead sources
+    const contactsSubscription = supabase
+      .channel('contacts-changes')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'contacts' 
+      }, () => {
+        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/lead-sources'] });
+        setLastUpdated(new Date());
+      })
+      .subscribe();
+      
+    // Subscribe to changes in tasks table
+    const tasksSubscription = supabase
+      .channel('tasks-changes')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'tasks' 
+      }, () => {
+        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/task-metrics'] });
+        setLastUpdated(new Date());
+      })
+      .subscribe();
+    
+    return () => {
+      // Clean up subscriptions
+      dealsSubscription.unsubscribe();
+      contactsSubscription.unsubscribe();
+      tasksSubscription.unsubscribe();
+    };
+  }, []);
+  
+  // Function to manually refresh all data
+  const refreshAllData = async () => {
+    setIsRefreshing(true);
+    setErrorDetails(null);
+    try {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/metrics'] }),
+        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/sales-performance'] }),
+        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/deals-by-stage'] }),
+        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/lead-sources'] }),
+        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/top-sales'] }),
+        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/task-metrics'] })
+      ]);
+      setLastUpdated(new Date());
+    } catch (error) {
+      console.error("Error refreshing data:", error);
+      setErrorDetails(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
-  const { data: dealsByStageData, isLoading: isDealsByStageLoading } = useQuery({
-    queryKey: ['/api/analytics/deals-by-stage'],
-  });
-
-  const { data: leadSourceData, isLoading: isLeadSourceLoading } = useQuery({
-    queryKey: ['/api/analytics/lead-sources'],
-  });
-
-  const { data: topSalesData, isLoading: isTopSalesLoading } = useQuery({
-    queryKey: ['/api/analytics/top-sales'],
-  });
-
-  const { data: metricsData, isLoading: isMetricsLoading } = useQuery({
+  // Fetch metrics data from API
+  const { data: metricsData, isLoading: isMetricsLoading, error: metricsError } = useQuery({
     queryKey: ['/api/dashboard/metrics'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase.rpc('get_dashboard_metrics');
+        if (error) throw error;
+        return data || {
+          totalDeals: 0,
+          pipelineValue: 0,
+          wonDeals: 0,
+          wonValue: 0,
+          totalContacts: 0,
+          newContacts: 0,
+          conversionRate: 0,
+          previousConversionRate: 0,
+          avgDealSize: 0,
+          previousAvgDealSize: 0,
+          previousWonValue: 0,
+          previousNewContacts: 0
+        };
+      } catch (error) {
+        console.error("Error fetching metrics:", error);
+        throw error;
+      }
+    },
+    retry: 2
   });
 
-  // Mock data until API is connected
-  const dealsByStage: DealsByStage[] = [
-    { name: "Lead", value: 25, color: COLORS[0] },
-    { name: "Qualified", value: 18, color: COLORS[1] },
-    { name: "Proposal", value: 12, color: COLORS[2] },
-    { name: "Negotiation", value: 8, color: COLORS[3] },
-    { name: "Closed", value: 15, color: COLORS[4] }
-  ];
+  // Fetch sales performance data
+  const { data: salesPerformanceData, isLoading: isSalesPerformanceLoading, error: salesPerformanceError } = useQuery({
+    queryKey: ['/api/dashboard/sales-performance', { period: timeRange }],
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase.rpc('get_sales_performance_data', { 
+          p_period: timeRange 
+        });
+        
+        if (error) {
+          console.error("Supabase RPC error:", error);
+          throw error;
+        }
+        
+        // If the RPC doesn't exist yet, fall back to direct query
+        if (!data) {
+          // Get all deals
+          const { data: deals, error: dealsError } = await supabase
+            .from('deals')
+            .select('*');
+          
+          if (dealsError) throw dealsError;
+          
+          // Process deals to create performance data
+          const now = new Date();
+          const currentPeriodDeals: Record<string, number> = {};
+          const previousPeriodDeals: Record<string, number> = {};
+          
+          // Determine period length in days
+          let periodDays = 30; // default to monthly
+          if (timeRange === 'weekly') periodDays = 7;
+          if (timeRange === 'quarterly') periodDays = 90;
+          if (timeRange === 'yearly') periodDays = 365;
+          
+          deals.forEach(deal => {
+            if (!deal.created_at || !deal.status || deal.status !== 'closed_won') return;
+            
+            const dealDate = new Date(deal.created_at);
+            const monthYear = dealDate.toLocaleDateString('en-US', { 
+              month: 'short', 
+              year: 'numeric' 
+            });
+            
+            const daysDiff = Math.floor((now.getTime() - dealDate.getTime()) / (1000 * 60 * 60 * 24));
+            
+            if (daysDiff <= periodDays) {
+              // Current period
+              currentPeriodDeals[monthYear] = (currentPeriodDeals[monthYear] || 0) + Number(deal.value || 0);
+            } else if (daysDiff <= periodDays * 2) {
+              // Previous period
+              previousPeriodDeals[monthYear] = (previousPeriodDeals[monthYear] || 0) + Number(deal.value || 0);
+            }
+          });
+          
+          // Format for chart
+          const salesData = Object.keys({ ...currentPeriodDeals, ...previousPeriodDeals })
+            .sort((a, b) => {
+              const dateA = new Date(a);
+              const dateB = new Date(b);
+              return dateA.getTime() - dateB.getTime();
+            })
+            .map(date => ({
+              name: date,
+              current: currentPeriodDeals[date] || 0,
+              previous: previousPeriodDeals[date] || 0
+            }));
+          
+          return { salesData };
+        }
+        
+        return { salesData: data || [] };
+      } catch (error) {
+        console.error("Error fetching sales performance:", error);
+        throw error;
+      }
+    },
+    retry: 2
+  });
 
-  const leadSources: LeadSource[] = [
-    { name: "Website", value: 38, color: COLORS[0] },
-    { name: "Referral", value: 22, color: COLORS[1] },
-    { name: "Social Media", value: 15, color: COLORS[2] },
-    { name: "Email", value: 12, color: COLORS[3] },
-    { name: "Events", value: 8, color: COLORS[4] }
-  ];
+  // Fetch deals by stage data
+  const { data: dealsByStage, isLoading: isDealsByStageLoading, error: dealsByStageError } = useQuery({
+    queryKey: ['/api/dashboard/deals-by-stage', { period: timeRange }],
+    queryFn: async () => {
+      const { data: stages, error: stagesError } = await supabase
+        .from('pipeline_stages')
+        .select('*')
+        .order('order', { ascending: true });
+      
+      if (stagesError) throw stagesError;
+      
+      const { data: deals, error: dealsError } = await supabase
+        .from('deals')
+        .select('*');
+      
+      if (dealsError) throw dealsError;
+      
+      return stages.map((stage, index) => {
+        const stageDeals = deals.filter(deal => deal.stage === stage.id);
+        return {
+          name: stage.name,
+          value: stageDeals.length,
+          color: COLORS[index % COLORS.length]
+        };
+      });
+    }
+  });
 
-  const topSalesPersons: TopSalesPerson[] = [
-    { id: 1, name: "Sarah Johnson", deals: 12, revenue: 85000 },
-    { id: 2, name: "Michael Chen", deals: 10, revenue: 72000 },
-    { id: 3, name: "Emma Rodriguez", deals: 8, revenue: 65000 },
-    { id: 4, name: "James Wilson", deals: 7, revenue: 58000 },
-    { id: 5, name: "Maria Garcia", deals: 6, revenue: 48000 }
-  ];
+  // Fetch lead sources data
+  const { data: leadSources, isLoading: isLeadSourceLoading, error: leadSourcesError } = useQuery({
+    queryKey: ['/api/dashboard/lead-sources', { period: timeRange }],
+    queryFn: async () => {
+      try {
+        // First try to get data from the RPC if it exists
+        const { data: rpcData, error: rpcError } = await supabase.rpc('get_lead_sources', {
+          p_period: timeRange
+        });
+        
+        // If RPC exists and works, use that data
+        if (!rpcError && rpcData) {
+          return rpcData.map((source: any, index: number) => ({
+            name: source.source || 'Unknown',
+            value: source.count,
+            color: COLORS[index % COLORS.length]
+          }));
+        }
+        
+        // Otherwise fall back to direct query
+        const { data, error } = await supabase
+          .from('contacts')
+          .select('source, created_at');
+        
+        if (error) throw error;
+        
+        // Determine period cutoff date
+        const now = new Date();
+        let cutoffDate = new Date();
+        if (timeRange === 'weekly') {
+          cutoffDate.setDate(now.getDate() - 7);
+        } else if (timeRange === 'monthly') {
+          cutoffDate.setMonth(now.getMonth() - 1);
+        } else if (timeRange === 'quarterly') {
+          cutoffDate.setMonth(now.getMonth() - 3);
+        } else if (timeRange === 'yearly') {
+          cutoffDate.setFullYear(now.getFullYear() - 1);
+        }
+        
+        // Filter contacts by period if created_at exists
+        const filteredContacts = data.filter(contact => {
+          if (!contact.created_at) return true; // Include if no date (can't filter)
+          return new Date(contact.created_at) >= cutoffDate;
+        });
+        
+        // Count leads by source
+        const sourceCount: Record<string, number> = {};
+        filteredContacts.forEach(contact => {
+          const source = contact.source || 'Unknown';
+          sourceCount[source] = (sourceCount[source] || 0) + 1;
+        });
+        
+        return Object.entries(sourceCount)
+          .map(([name, value], index) => ({
+            name,
+            value,
+            color: COLORS[index % COLORS.length]
+          }))
+          .sort((a, b) => b.value - a.value);
+      } catch (error) {
+        console.error("Error fetching lead sources:", error);
+        throw error;
+      }
+    },
+    retry: 2
+  });
+  
+  // Fetch top sales performers data
+  const { data: topSalesData, isLoading: isTopSalesLoading, error: topSalesError } = useQuery({
+    queryKey: ['/api/dashboard/top-sales', { period: timeRange }],
+    queryFn: async () => {
+      try {
+        // First try to get data from the RPC if it exists
+        const { data: rpcData, error: rpcError } = await supabase.rpc('get_top_sales_performers', {
+          p_period: timeRange
+        });
+        
+        // If RPC exists and works, use that data
+        if (!rpcError && rpcData) {
+          return { performers: rpcData || [] };
+        }
+        
+        // Otherwise fall back to direct queries
+        const { data: users, error: usersError } = await supabase
+          .from('users')
+          .select('id, full_name');
+        
+        if (usersError) throw usersError;
+        
+        // Determine period cutoff date
+        const now = new Date();
+        let cutoffDate = new Date();
+        if (timeRange === 'weekly') {
+          cutoffDate.setDate(now.getDate() - 7);
+        } else if (timeRange === 'monthly') {
+          cutoffDate.setMonth(now.getMonth() - 1);
+        } else if (timeRange === 'quarterly') {
+          cutoffDate.setMonth(now.getMonth() - 3);
+        } else if (timeRange === 'yearly') {
+          cutoffDate.setFullYear(now.getFullYear() - 1);
+        }
+        
+        const { data: deals, error: dealsError } = await supabase
+          .from('deals')
+          .select('*')
+          .eq('status', 'closed_won');
+        
+        if (dealsError) throw dealsError;
+        
+        // Filter deals by period if created_at exists
+        const filteredDeals = deals.filter(deal => {
+          if (!deal.created_at) return true; // Include if no date (can't filter)
+          return new Date(deal.created_at) >= cutoffDate;
+        });
+        
+        // Group deals by owner and calculate totals
+        const performerMap: Record<string, { id: number, name: string, deals: number, revenue: number }> = {};
+        
+        filteredDeals.forEach(deal => {
+          const ownerId = deal.owner_id || 0;
+          const owner = users.find(user => user.id === ownerId);
+          
+          if (!performerMap[ownerId]) {
+            performerMap[ownerId] = {
+              id: ownerId,
+              name: owner ? owner.full_name : `User ${ownerId}`,
+              deals: 0,
+              revenue: 0
+            };
+          }
+          
+          performerMap[ownerId].deals += 1;
+          performerMap[ownerId].revenue += Number(deal.value) || 0;
+        });
+        
+        return { 
+          performers: Object.values(performerMap)
+            .sort((a, b) => b.revenue - a.revenue)
+            .slice(0, 5) 
+        };
+      } catch (error) {
+        console.error("Error fetching top sales performers:", error);
+        throw error;
+      }
+    },
+    retry: 2
+  });
 
-  const metrics: MetricTile[] = [
+  // Format metrics for display
+  const metrics = [
     { 
       title: "Total Revenue", 
-      value: 325000, 
-      change: 12.5, 
-      changeType: "increase", 
+      value: metricsData?.wonValue || 0, 
+      change: calculateChange(metricsData?.wonValue, metricsData?.previousWonValue), 
+      changeType: (metricsData?.wonValue || 0) >= (metricsData?.previousWonValue || 0) ? "increase" : "decrease", 
       format: "currency" 
     },
     { 
       title: "Conversion Rate", 
-      value: 28.5, 
-      change: 3.2, 
-      changeType: "increase", 
+      value: metricsData?.conversionRate || 0, 
+      change: calculateChange(metricsData?.conversionRate, metricsData?.previousConversionRate), 
+      changeType: (metricsData?.conversionRate || 0) >= (metricsData?.previousConversionRate || 0) ? "increase" : "decrease", 
       format: "percentage" 
     },
     { 
       title: "Average Deal Size", 
-      value: 15000, 
-      change: -2.3, 
-      changeType: "decrease", 
+      value: metricsData?.avgDealSize || 0, 
+      change: calculateChange(metricsData?.avgDealSize, metricsData?.previousAvgDealSize), 
+      changeType: (metricsData?.avgDealSize || 0) >= (metricsData?.previousAvgDealSize || 0) ? "increase" : "decrease", 
       format: "currency" 
     },
     { 
       title: "New Leads", 
-      value: 127, 
-      change: 18.7, 
-      changeType: "increase", 
+      value: metricsData?.newContacts || 0, 
+      change: calculateChange(metricsData?.newContacts, metricsData?.previousNewContacts), 
+      changeType: (metricsData?.newContacts || 0) >= (metricsData?.previousNewContacts || 0) ? "increase" : "decrease", 
       format: "number" 
     }
   ];
+
+  // Helper function to calculate percentage change
+  function calculateChange(current: number = 0, previous: number = 0): number {
+    if (previous === 0) return 0;
+    return Number(((current - previous) / previous * 100).toFixed(1));
+  }
 
   // Format value based on type
   const formatMetricValue = (value: number | string, format: string) => {
@@ -176,31 +475,106 @@ export default function Analytics() {
     return value;
   };
 
+  // Handle time range change
+  const handleTimeRangeChange = (value: string) => {
+    setTimeRange(value);
+  };
+
+  // Check if any errors occurred
+  const hasErrors = metricsError || salesPerformanceError || dealsByStageError || leadSourcesError || topSalesError;
+  
+  // Helper function to format Supabase errors
+  const formatSupabaseError = (error: any): string => {
+    if (!error) return 'Unknown error';
+    
+    if (error.message) return error.message;
+    if (error.error_description) return error.error_description;
+    if (error.details) return error.details;
+    
+    return JSON.stringify(error);
+  };
+
+  // Collect error details for display
+  useEffect(() => {
+    const errors = [];
+    if (metricsError) errors.push(`Metrics: ${formatSupabaseError(metricsError)}`);
+    if (salesPerformanceError) errors.push(`Sales Performance: ${formatSupabaseError(salesPerformanceError)}`);
+    if (dealsByStageError) errors.push(`Deals by Stage: ${formatSupabaseError(dealsByStageError)}`);
+    if (leadSourcesError) errors.push(`Lead Sources: ${formatSupabaseError(leadSourcesError)}`);
+    if (topSalesError) errors.push(`Top Sales: ${formatSupabaseError(topSalesError)}`);
+    
+    if (errors.length > 0) {
+      setErrorDetails(errors.join('\n'));
+    } else {
+      setErrorDetails(null);
+    }
+  }, [metricsError, salesPerformanceError, dealsByStageError, leadSourcesError, topSalesError]);
+
   return (
     <main className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-900 p-4 md:p-6">
       <div className="mb-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <h1 className="text-2xl font-semibold">Analytics</h1>
-          
-          <div className="flex flex-wrap items-center gap-4">
-            <Select value={timeRange} onValueChange={setTimeRange}>
-              <SelectTrigger className="w-40">
+          <div className="flex items-center space-x-2">
+            <Select value={timeRange} onValueChange={handleTimeRangeChange}>
+              <SelectTrigger className="w-[180px]">
                 <Calendar className="mr-2 h-4 w-4" />
                 <SelectValue placeholder="Select period" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="monthly">Monthly</SelectItem>
-                <SelectItem value="quarterly">Quarterly</SelectItem>
-                <SelectItem value="yearly">Yearly</SelectItem>
+                <SelectItem value="weekly">This Week</SelectItem>
+                <SelectItem value="monthly">This Month</SelectItem>
+                <SelectItem value="quarterly">This Quarter</SelectItem>
+                <SelectItem value="yearly">This Year</SelectItem>
               </SelectContent>
             </Select>
-            
-            <Button variant="outline">
-              <Download className="mr-2 h-4 w-4" /> Export
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={refreshAllData}
+              disabled={isRefreshing}
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </Button>
+            <Button variant="outline" size="icon">
+              <Download className="h-4 w-4" />
             </Button>
           </div>
         </div>
+        <div className="text-sm text-slate-500 mt-2">
+          Last updated: {format(lastUpdated, 'MMM d, yyyy HH:mm:ss')}
+        </div>
       </div>
+
+      {/* Error message if any API calls failed */}
+      {hasErrors && (
+        <Card className="mb-6 border-destructive">
+          <CardContent className="p-4">
+            <div className="flex flex-col text-destructive">
+              <p className="font-medium">There was an error loading some analytics data. Please try refreshing.</p>
+              {errorDetails && (
+                <details className="mt-2 text-sm">
+                  <summary className="cursor-pointer">View error details</summary>
+                  <pre className="mt-2 p-2 bg-slate-100 dark:bg-slate-800 rounded overflow-x-auto">
+                    {errorDetails}
+                  </pre>
+                </details>
+              )}
+            </div>
+          </CardContent>
+          <CardFooter className="px-4 py-3 border-t">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={refreshAllData}
+              disabled={isRefreshing}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+              Refresh Data
+            </Button>
+          </CardFooter>
+        </Card>
+      )}
 
       {/* Metrics overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -278,6 +652,11 @@ export default function Analytics() {
                 <div className="flex items-center justify-center h-80">
                   <Skeleton className="h-72 w-full rounded-lg" />
                 </div>
+              ) : salesPerformanceData?.salesData?.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-80 text-center">
+                  <Activity className="h-12 w-12 text-slate-400 mb-4" />
+                  <p className="text-slate-500">No sales data available for the selected period.</p>
+                </div>
               ) : (
                 <ResponsiveContainer width="100%" height={400}>
                   <LineChart
@@ -337,7 +716,7 @@ export default function Analytics() {
               ) : (
                 <ResponsiveContainer width="100%" height={400}>
                   <BarChart
-                    data={dealsByStage}
+                    data={dealsByStage || []}
                     margin={{
                       top: 20,
                       right: 30,
@@ -351,8 +730,8 @@ export default function Analytics() {
                     <Tooltip />
                     <Legend />
                     <Bar dataKey="value" name="Number of Deals">
-                      {dealsByStage.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      {(dealsByStage || []).map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color || COLORS[index % COLORS.length]} />
                       ))}
                     </Bar>
                   </BarChart>
@@ -382,7 +761,7 @@ export default function Analytics() {
                     <ResponsiveContainer width={300} height={300}>
                       <PieChart>
                         <Pie
-                          data={leadSources}
+                          data={leadSources || []}
                           cx="50%"
                           cy="50%"
                           labelLine={false}
@@ -393,8 +772,8 @@ export default function Analytics() {
                             `${name}: ${(percent * 100).toFixed(0)}%`
                           }
                         >
-                          {leadSources.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          {(leadSources || []).map((entry: { name: string; value: number; color?: string }, index: number) => (
+                            <Cell key={`cell-${index}`} fill={entry.color || COLORS[index % COLORS.length]} />
                           ))}
                         </Pie>
                         <Tooltip 
@@ -405,20 +784,25 @@ export default function Analytics() {
                   </div>
                   <div className="lg:w-1/2">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {leadSources.map((source, index) => (
-                        <div key={index} className="flex items-center">
-                          <div 
-                            className="w-4 h-4 mr-2 rounded-full" 
-                            style={{ backgroundColor: source.color }}
-                          ></div>
-                          <div className="flex-1">
-                            <div className="font-medium">{source.name}</div>
-                            <div className="text-slate-500 text-sm">
-                              {source.value} leads ({((source.value / leadSources.reduce((a, b) => a + b.value, 0)) * 100).toFixed(1)}%)
+                      {(leadSources || []).map((source: { name: string; value: number; color?: string }, index: number) => {
+                        const totalLeads = (leadSources || []).reduce((a: number, b: { value: number }) => a + (b.value || 0), 0);
+                        const percentage = totalLeads > 0 ? ((source.value || 0) / totalLeads) * 100 : 0;
+                        
+                        return (
+                          <div key={index} className="flex items-center">
+                            <div 
+                              className="w-4 h-4 mr-2 rounded-full" 
+                              style={{ backgroundColor: source.color || COLORS[index % COLORS.length] }}
+                            ></div>
+                            <div className="flex-1">
+                              <div className="font-medium">{source.name}</div>
+                              <div className="text-slate-500 text-sm">
+                                {source.value} leads ({percentage.toFixed(1)}%)
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 </>
@@ -427,6 +811,13 @@ export default function Analytics() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Advanced Analytics Components */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <SalesProbabilityChart />
+        <ConversionFunnel />
+        <DealVelocity />
+      </div>
 
       {/* Top Performers */}
       <Card>
@@ -455,7 +846,7 @@ export default function Analytics() {
             </div>
           ) : (
             <div className="space-y-1">
-              {topSalesPersons.map((person, index) => (
+              {(topSalesData?.performers || []).map((person: { name: string; deals: number; revenue: number }, index: number) => (
                 <div 
                   key={index}
                   className="flex items-center py-3 px-2 border-b dark:border-slate-700 last:border-0"

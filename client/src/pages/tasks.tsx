@@ -390,7 +390,7 @@ export default function Tasks() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {normalizedUsers.find(user => user.id === task.assignedTo)?.name || "Unassigned"}
+                        {normalizedUsers.find((user: { id: number }) => user.id === task.assigned_to)?.name || "Unassigned"}
                       </TableCell>
                       <TableCell>
                         <div className="flex justify-end gap-2">

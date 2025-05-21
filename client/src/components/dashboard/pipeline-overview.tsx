@@ -23,11 +23,13 @@ type DealCardProps = {
 };
 
 function DealCard({ deal, badgeColor }: DealCardProps) {
-  const initials = deal.owner.name
-    .split(' ')
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase();
+  const initials = deal.owner?.name
+    ? deal.owner.name
+        .split(' ')
+        .map((n) => n[0])
+        .join('')
+        .toUpperCase()
+    : '';
 
   // Calculate time since update
   const updatedDate = new Date(deal.updatedAt);
@@ -61,8 +63,8 @@ function DealCard({ deal, badgeColor }: DealCardProps) {
       <div className="flex items-center justify-between mt-3">
         <div className="flex -space-x-1">
           <Avatar className="h-6 w-6 border-2 border-white dark:border-slate-800">
-            <AvatarImage src={deal.owner.avatarUrl} alt={deal.owner.name} />
-            <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+            <AvatarImage src={deal.owner?.avatarUrl} alt={deal.owner?.name || 'Owner'} />
+            <AvatarFallback className="text-xs">{initials || 'U'}</AvatarFallback>
           </Avatar>
         </div>
         <span className="text-xs text-slate-500 dark:text-slate-400">{timeAgo}</span>

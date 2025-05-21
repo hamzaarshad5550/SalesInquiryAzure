@@ -13,7 +13,7 @@ interface Deal {
   name: string;
   value: number;
   description?: string;
-  stage_id?: number; // Make optional since it might not exist
+  stage?: number; // Make optional since it might not exist
   stage?: number;    // Add this as an alternative
   expected_close_date?: string;
   contact_id: number;
@@ -181,10 +181,10 @@ export const storage = {
         ?.filter((deal: Deal) => new Date(deal.expected_close_date || '') >= now)
         .reduce((sum: number, deal: Deal) => sum + Number(deal.value), 0) || 0;
       
-      // Use 'stage' instead of 'stage_id' if that's what exists in the database
-      const wonDeals = deals?.filter((deal: Deal) => deal.stage === 5 || deal.stage_id === 5).length || 0;
+      // Use 'stage' instead of 'stage' if that's what exists in the database
+      const wonDeals = deals?.filter((deal: Deal) => deal.stage === 5 || deal.stage === 5).length || 0;
       const wonValue = deals
-        ?.filter((deal: Deal) => deal.stage === 5 || deal.stage_id === 5)
+        ?.filter((deal: Deal) => deal.stage === 5 || deal.stage === 5)
         .reduce((sum: number, deal: Deal) => sum + Number(deal.value), 0) || 0;
 
       const totalContacts = contacts?.length || 0;
@@ -229,7 +229,7 @@ export const storage = {
       const { data: allDeals, error } = await supabase
         .from('deals')
         .select('*')
-        .or(`stage.eq.5,stage_id.eq.5`); // Try both column names for Closed Won
+        .or(`stage.eq.5,stage.eq.5`); // Try both column names for Closed Won
     
       if (error) {
         console.error("Supabase query error:", error);
@@ -397,26 +397,23 @@ export const storage = {
       const { data: stages, error: stagesError } = await supabase
         .from('pipeline_stages')
         .select('*')
-        .order('order', { ascending: true });
+        .order('"order"', { ascending: true });
       
       if (stagesError) throw stagesError;
       
       // Get all deals
       const { data: deals, error: dealsError } = await supabase
         .from('deals')
-        .select('*, stage:pipeline_stages(*)');
+        .select('*');
       
       if (dealsError) throw dealsError;
       
-      // Process and format the data similar to what Drizzle provides
-      const result = stages?.map((stage: PipelineStage) => {
-        // Find deals for this stage - check both stage and stage_id columns
+      // Process and format the data manually since the relationship isn't working
+      const result = stages?.map((stage) => {
+        // Find deals for this stage - using 'stage' instead of 'stage'
         const stageDeals = deals
-          ?.filter((deal: Deal) => 
-            (deal.stage_id !== undefined && deal.stage_id === stage.id) || 
-            (deal.stage !== undefined && deal.stage === stage.id)
-          )
-          .sort((a: Deal, b: Deal) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+          ?.filter(deal => deal.stage === stage.id)
+          .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
           .slice(0, 5); // Limit to 5 deals
         
         return {
@@ -583,7 +580,7 @@ export const storage = {
       // Process and format the data similar to what Drizzle provides
       const result = stages?.map((stage: PipelineStage) => {
         // Find deals for this stage
-        const stageDeals = sortedDeals?.filter((deal: Deal) => deal.stage_id === stage.id) || [];
+        const stageDeals = sortedDeals?.filter((deal: Deal) => deal.stage === stage.id) || [];
           
         return {
           ...stage,
@@ -1045,7 +1042,7 @@ export const storage = {
       const { data: deal, error } = await supabase
         .from('deals')
         .update({
-          stage_id: stageId,
+          stage: stage,
           updated_at: new Date().toISOString()
         })
         .eq('id', dealId)
@@ -1274,11 +1271,12 @@ export const storage = {
         formattedData.assigned_to = taskData.assignedTo;
       }
       
-      if (taskData.relatedToType !== undefined) {
+      // Handle related_to_type and related_to_id even if they're not in the type
+      if ('relatedToType' in taskData) {
         formattedData.related_to_type = taskData.relatedToType;
       }
       
-      if (taskData.relatedToId !== undefined) {
+      if ('relatedToId' in taskData) {
         formattedData.related_to_id = taskData.relatedToId;
       }
       
@@ -1315,6 +1313,101 @@ export const storage = {
     } catch (error) {
       handleError(error, 'updateTask');
       return null;
+    }
+  },
+
+  /**
+   * Gets all pipeline stages
+   */
+  async getPipelineStages() {
+    try {
+      // Check if the pipeline_stages table exists
+      const { error: tableCheckError } = await supabase
+        .from('pipeline_stages')
+        .select('count')
+        .limit(1);
+      
+      // If table doesn't exist, return sample data
+      if (tableCheckError && tableCheckError.code === '42P01') {
+        console.log("pipeline_stages table doesn't exist, returning sample data");
+        return [
+          {
+            id: 1,
+            name: "Lead",
+            color: "#6366F1",
+            order: 1
+          },
+          {
+            id: 2,
+            name: "Qualified",
+            color: "#8B5CF6",
+            order: 2
+          },
+          {
+            id: 3,
+            name: "Proposal",
+            color: "#EC4899",
+            order: 3
+          },
+          {
+            id: 4,
+            name: "Negotiation",
+            color: "#F59E0B",
+            order: 4
+          },
+          {
+            id: 5,
+            name: "Closed Won",
+            color: "#10B981",
+            order: 5
+          }
+        ];
+      }
+      
+      // Get all pipeline stages
+      const { data: stages, error: stagesError } = await supabase
+        .from('pipeline_stages')
+        .select('*')
+        .order('order', { ascending: true });
+      
+      if (stagesError) throw stagesError;
+      
+      return stages || [];
+    } catch (error) {
+      handleError(error, 'getPipelineStages');
+      // Return sample data as fallback
+      return [
+        {
+          id: 1,
+          name: "Lead",
+          color: "#6366F1",
+          order: 1
+        },
+        {
+          id: 2,
+          name: "Qualified",
+          color: "#8B5CF6",
+          order: 2
+        },
+        {
+          id: 3,
+          name: "Proposal",
+          color: "#EC4899",
+          order: 3
+        },
+        {
+          id: 4,
+          name: "Negotiation",
+          color: "#F59E0B",
+          order: 4
+        },
+        {
+          id: 5,
+          name: "Closed Won",
+          color: "#10B981",
+          order: 5
+        }
+      ];
     }
   }
 };

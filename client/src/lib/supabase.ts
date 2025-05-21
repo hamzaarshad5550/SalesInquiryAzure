@@ -139,3 +139,77 @@ export async function deleteFile(bucket: string, path: string) {
   if (error) throw error;
   return true;
 }
+
+// Fetch all pipeline stages
+export async function fetchPipelineStages() {
+  const { data, error } = await supabase
+    .from('pipeline_stages')
+    .select('*')
+    .order('"order"', { ascending: true });
+  
+  if (error) throw error;
+  return data;
+}
+
+// Fetch all deals
+export async function fetchDeals(filters = {}) {
+  let query = supabase
+    .from('deals')
+    .select('*');
+  
+  // Apply any filters
+  if ('stageId' in filters && filters.stageId) {
+    query = query.eq('stage', filters.stageId); // Using 'stage' instead of 'stage_id'
+  }
+  
+  if ('ownerId' in filters && filters.ownerId) {
+    query = query.eq('owner_id', filters.ownerId);
+  }
+  
+  // Sort by updated_at by default
+  const { data, error } = await query.order('updated_at', { ascending: false });
+  
+  if (error) {
+    console.error("Error fetching deals:", error);
+    throw error;
+  }
+  return data;
+}
+
+// Create a new deal
+export async function createDeal(dealData: Record<string, any>) {
+  // Make sure we're using the correct column name 'stage' instead of 'stage'
+  const { data, error } = await supabase
+    .from('deals')
+    .insert(dealData)
+    .select()
+    .single();
+  
+  if (error) {
+    console.error("Error creating deal:", error);
+    throw error;
+  }
+  return data;
+}
+
+// Update a deal
+export async function updateDeal(dealId, updates) {
+  const { data, error } = await supabase
+    .from('deals')
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', dealId)
+    .select()
+    .single();
+  
+  if (error) throw error;
+  return data;
+}
+
+// Move a deal to a different stage
+export async function moveDealToStage(dealId: string, stageId: string) {
+  // Use 'stage' instead of 'stage_id'
+  return updateDeal(dealId, { stage: stageId });
+}

@@ -203,10 +203,10 @@ export const getGmailMessageDetail = async (messageId: string) => {
     
     // Extract headers
     const headers = message.payload.headers;
-    const subject = headers.find(h => h.name === 'Subject')?.value || '';
-    const from = headers.find(h => h.name === 'From')?.value || '';
-    const to = headers.find(h => h.name === 'To')?.value || '';
-    const date = headers.find(h => h.name === 'Date')?.value || '';
+    const subject = headers.find((h: { name: string; value?: string }) => h.name === 'Subject')?.value || '';
+    const from = headers.find((h: { name: string; value?: string }) => h.name === 'From')?.value || '';
+    const to = headers.find((h: { name: string; value?: string }) => h.name === 'To')?.value || '';
+    const date = headers.find((h: { name: string; value?: string }) => h.name === 'Date')?.value || '';
     
     // Extract body content
     let body = '';
