@@ -50,14 +50,18 @@ jobs:
           cp -r dist deployment/
           cp package.json package-lock.json deployment/
           
-          # Install production dependencies with reduced memory usage
+          # Create a temporary package.json with fixed esbuild version
           cd deployment
-          npm ci --only=production --no-optional --prefer-offline
+          # Modify package.json to pin esbuild version
+          node -e "
+            const pkg = require('./package.json');
+            if (!pkg.resolutions) pkg.resolutions = {};
+            pkg.resolutions['esbuild'] = '0.18.20';
+            require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+          "
           
-          # Remove unnecessary files to reduce size
-          rm -rf node_modules/.cache
-          rm -rf node_modules/.bin
-          find node_modules -type d -name "test" -o -name "tests" -o -name "docs" | xargs rm -rf
+          # Install production dependencies with npm instead of npm ci to respect resolutions
+          npm install --only=production --no-optional --prefer-offline --no-audit
           
           # Create web.config for Azure
           echo '<?xml version="1.0" encoding="utf-8"?><configuration><system.webServer><handlers><add name="iisnode" path="dist/index.js" verb="*" modules="iisnode" /></handlers><rewrite><rules><rule name="nodejs"><match url="(.*)" /><conditions><add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true" /></conditions><action type="Rewrite" url="dist/index.js" /></rule></rules></rewrite><security><requestFiltering removeServerHeader="true" /></security></system.webServer></configuration>' > web.config
@@ -122,10 +126,6 @@ jobs:
               {
                 "name": "PORT",
                 "value": "5000"
-              },
-              {
-                "name": "WEBSITE_NODE_DEFAULT_VERSION",
-                "value": "~20"
               },
               {
                 "name": "WEBSITE_NODE_DEFAULT_VERSION",
