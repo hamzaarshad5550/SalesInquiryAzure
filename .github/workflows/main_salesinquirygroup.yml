@@ -44,7 +44,9 @@ jobs:
         run: |
           mkdir -p deployment
           # Include server files and built client files
-          cp -r dist package.json package-lock.json .env.example deployment/
+          cp -r dist package.json package-lock.json deployment/
+          # Create a basic .env file for production
+          echo "NODE_ENV=production" > deployment/.env
           # Create web.config for Azure if needed
           echo '<?xml version="1.0" encoding="utf-8"?><configuration><system.webServer><handlers><add name="iisnode" path="dist/index.js" verb="*" modules="iisnode" /></handlers><rewrite><rules><rule name="nodejs"><match url="(.*)" /><conditions><add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true" /></conditions><action type="Rewrite" url="dist/index.js" /></rule></rules></rewrite><security><requestFiltering removeServerHeader="true" /></security></system.webServer></configuration>' > deployment/web.config
           cd deployment && zip -r ../release.zip ./*
