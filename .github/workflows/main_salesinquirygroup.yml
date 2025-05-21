@@ -15,12 +15,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 1  # Shallow clone to save space
+          fetch-depth: 1
 
       - name: Set up Node.js version
         uses: actions/setup-node@v3
         with:
-          node-version: '20.x'  # Changed to 20.x to match the .replit config
+          node-version: '20.x'
           cache: 'npm'
 
       - name: Free up disk space
@@ -37,19 +37,28 @@ jobs:
         run: npm run build
         env:
           NODE_ENV: production
-          # Add any environment variables needed for build here
-          # DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       - name: Create deployment package
         run: |
+          # Create a production-ready package
           mkdir -p deployment
-          # Include server files and built client files
-          cp -r dist package.json package-lock.json deployment/
-          # Create a basic .env file for production
-          echo "NODE_ENV=production" > deployment/.env
-          # Create web.config for Azure if needed
-          echo '<?xml version="1.0" encoding="utf-8"?><configuration><system.webServer><handlers><add name="iisnode" path="dist/index.js" verb="*" modules="iisnode" /></handlers><rewrite><rules><rule name="nodejs"><match url="(.*)" /><conditions><add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true" /></conditions><action type="Rewrite" url="dist/index.js" /></rule></rules></rewrite><security><requestFiltering removeServerHeader="true" /></security></system.webServer></configuration>' > deployment/web.config
-          cd deployment && zip -r ../release.zip ./*
+          
+          # Copy built files and package files
+          cp -r dist deployment/
+          cp package.json package-lock.json deployment/
+          
+          # Install production dependencies in the deployment folder
+          cd deployment
+          npm ci --only=production
+          
+          # Create web.config for Azure
+          echo '<?xml version="1.0" encoding="utf-8"?><configuration><system.webServer><handlers><add name="iisnode" path="dist/index.js" verb="*" modules="iisnode" /></handlers><rewrite><rules><rule name="nodejs"><match url="(.*)" /><conditions><add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true" /></conditions><action type="Rewrite" url="dist/index.js" /></rule></rules></rewrite><security><requestFiltering removeServerHeader="true" /></security></system.webServer></configuration>' > web.config
+          
+          # Create a basic .env file
+          echo "NODE_ENV=production" > .env
+          
+          # Zip everything for deployment
+          zip -r ../release.zip ./*
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
@@ -109,5 +118,9 @@ jobs:
               {
                 "name": "WEBSITE_NODE_DEFAULT_VERSION",
                 "value": "~20"
+              },
+              {
+                "name": "SCM_DO_BUILD_DURING_DEPLOYMENT",
+                "value": "false"
               }
             ]
