@@ -11,8 +11,17 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      contents: read # This is required for actions/checkout
 
     steps:
+      - name: Clean up workspace before build
+        run: |
+          echo "Cleaning up unnecessary files before build..."
+          rm -rf node_modules
+          rm -rf dist
+          rm -rf .next
+          df -h  # Check disk space
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1  # Shallow clone to save space
@@ -65,6 +74,8 @@ jobs:
     permissions:
       id-token: write
       contents: read
+      id-token: write # This is required for requesting the JWT
+      contents: read  # This is required for actions/checkout
 
     steps:
       - name: Download artifact from build job
@@ -112,3 +123,8 @@ jobs:
 
 
 
+
+
+      - name: Clean up workspace after deployment
+        if: always()
+        run: rm -rf ${{ github.workspace }}
