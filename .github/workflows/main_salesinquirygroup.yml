@@ -32,24 +32,32 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
 
       - name: Build application
         run: npm run build
         env:
           NODE_ENV: production
+          NODE_OPTIONS: "--max_old_space_size=4096"
 
       - name: Create deployment package
         run: |
-          # Create a production-ready package
+          # Create a production-ready package with smaller footprint
           mkdir -p deployment
           
-          # Copy built files and package files
+          # Copy only necessary files
           cp -r dist deployment/
           cp package.json package-lock.json deployment/
           
-          # Install production dependencies in the deployment folder
+          # Install production dependencies with reduced memory usage
           cd deployment
-          npm ci --only=production
+          npm ci --only=production --no-optional --prefer-offline
+          
+          # Remove unnecessary files to reduce size
+          rm -rf node_modules/.cache
+          rm -rf node_modules/.bin
+          find node_modules -type d -name "test" -o -name "tests" -o -name "docs" | xargs rm -rf
           
           # Create web.config for Azure
           echo '<?xml version="1.0" encoding="utf-8"?><configuration><system.webServer><handlers><add name="iisnode" path="dist/index.js" verb="*" modules="iisnode" /></handlers><rewrite><rules><rule name="nodejs"><match url="(.*)" /><conditions><add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true" /></conditions><action type="Rewrite" url="dist/index.js" /></rule></rules></rewrite><security><requestFiltering removeServerHeader="true" /></security></system.webServer></configuration>' > web.config
@@ -57,8 +65,8 @@ jobs:
           # Create a basic .env file
           echo "NODE_ENV=production" > .env
           
-          # Zip everything for deployment
-          zip -r ../release.zip ./*
+          # Zip everything for deployment with compression to reduce size
+          zip -r ../release.zip ./* -9
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
@@ -120,7 +128,15 @@ jobs:
                 "value": "~20"
               },
               {
+                "name": "WEBSITE_NODE_DEFAULT_VERSION",
+                "value": "~20"
+              },
+              {
                 "name": "SCM_DO_BUILD_DURING_DEPLOYMENT",
                 "value": "false"
+              },
+              {
+                "name": "WEBSITE_MEMORY_LIMIT_MB",
+                "value": "2048"
               }
             ]
