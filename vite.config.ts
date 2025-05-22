@@ -2,6 +2,15 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 
+// Check if terser is available
+let hasTerser = false;
+try {
+  require.resolve('terser');
+  hasTerser = true;
+} catch (e) {
+  console.warn('Terser not found, falling back to esbuild minifier');
+}
+
 export default defineConfig({
   plugins: [
     react(),
@@ -41,13 +50,15 @@ export default defineConfig({
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
     sourcemap: false, // Disable sourcemaps in production to save memory
-    minify: 'terser', // Use terser for better minification
-    terserOptions: {
-      compress: {
-        drop_console: process.env.NODE_ENV === 'production', // Remove console logs in production
-        drop_debugger: true
+    minify: hasTerser ? 'terser' : 'esbuild', // Use terser if available, otherwise esbuild
+    ...(hasTerser && {
+      terserOptions: {
+        compress: {
+          drop_console: process.env.NODE_ENV === 'production', // Remove console logs in production
+          drop_debugger: true
+        }
       }
-    },
+    }),
     rollupOptions: {
       external: [],
       output: {

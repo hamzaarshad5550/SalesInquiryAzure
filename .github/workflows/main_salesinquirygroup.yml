@@ -31,6 +31,8 @@ jobs:
 
       - name: Install dependencies
         run: |
+          # Install terser explicitly
+          npm install --no-save terser
           # Use smaller dependency set if possible
           npm ci --no-audit --prefer-offline --production=false
         env:
