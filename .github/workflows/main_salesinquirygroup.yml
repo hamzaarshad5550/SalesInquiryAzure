@@ -23,13 +23,6 @@ jobs:
           node-version: '20.x'
           cache: 'npm'
 
-      - name: Free up disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /usr/local/share/boost
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-
       - name: Install dependencies
         run: npm ci
         env:
@@ -43,43 +36,107 @@ jobs:
 
       - name: Create deployment package
         run: |
+          # Extract original dependencies from package.json
+          DEPS=$(node -e "const pkg = require('./package.json'); console.log(JSON.stringify(pkg.dependencies || {}))")
+          DEV_DEPS=$(node -e "const pkg = require('./package.json'); console.log(JSON.stringify(pkg.devDependencies || {}))")
+          
           # Create a production-ready package
           mkdir -p deployment
           
-          # Copy built files
+          # Copy built files and necessary assets
           cp -r dist deployment/
           
-          # Create a minimal package.json with start script and runtime dependencies
-          cat > deployment/package.json << EOF
-          {
-            "name": "sales-inquiry-azure",
-            "version": "1.0.0",
-            "type": "module",
-            "engines": {
-              "node": ">=20.0.0"
-            },
-            "scripts": {
-              "start": "NODE_ENV=production node dist/index.js"
-            },
-            "dependencies": {
-              "express": "^4.18.2",
-              "dotenv": "^16.5.0",
-              "pg": "^8.16.0",
-              "drizzle-orm": "^0.43.1",
-              "@supabase/supabase-js": "^2.49.4"
-            }
-          }
+          # Copy original package.json but modify it for production
+          node -e "
+            const pkg = require('./package.json');
+            
+            // Keep only what's needed for production
+            const newPkg = {
+              name: pkg.name,
+              version: pkg.version,
+              type: pkg.type,
+              engines: pkg.engines,
+              scripts: {
+                start: 'node dist/index.js'
+              },
+              dependencies: pkg.dependencies
+            };
+            
+            // Remove dev dependencies
+            delete newPkg.devDependencies;
+            delete newPkg.optionalDependencies;
+            
+            // Write the modified package.json
+            require('fs').writeFileSync('./deployment/package.json', JSON.stringify(newPkg, null, 2));
+          "
+          
+          # Create a startup file for Azure
+          cat > deployment/startup.js << EOF
+          // startup.js - Azure startup script
+          const { spawn } = require('child_process');
+          const path = require('path');
+          
+          // Log the environment for debugging
+          console.log('Starting application with environment:');
+          console.log('NODE_ENV:', process.env.NODE_ENV);
+          console.log('PORT:', process.env.PORT);
+          console.log('Current directory:', process.cwd());
+          console.log('Files in directory:', require('fs').readdirSync('.'));
+          console.log('Files in dist directory:', require('fs').readdirSync('./dist'));
+          
+          // Start the application
+          const app = spawn('node', ['dist/index.js'], {
+            stdio: 'inherit',
+            env: { ...process.env, NODE_ENV: 'production' }
+          });
+          
+          app.on('error', (err) => {
+            console.error('Failed to start application:', err);
+            process.exit(1);
+          });
+          
+          app.on('exit', (code) => {
+            console.log('Application exited with code:', code);
+            process.exit(code);
+          });
           EOF
           
-          # Install only the essential dependencies
-          cd deployment
-          npm install --no-package-lock --production
-          
-          # Create web.config for Azure
-          echo '<?xml version="1.0" encoding="utf-8"?><configuration><system.webServer><handlers><add name="iisnode" path="dist/index.js" verb="*" modules="iisnode" /></handlers><rewrite><rules><rule name="nodejs"><match url="(.*)" /><conditions><add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true" /></conditions><action type="Rewrite" url="dist/index.js" /></rule></rules></rewrite><security><requestFiltering removeServerHeader="true" /></security></system.webServer></configuration>' > web.config
+          # Create web.config for Azure with startup.js
+          cat > deployment/web.config << EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <configuration>
+            <system.webServer>
+              <handlers>
+                <add name="iisnode" path="startup.js" verb="*" modules="iisnode" />
+              </handlers>
+              <rewrite>
+                <rules>
+                  <rule name="nodejs">
+                    <match url="(.*)" />
+                    <conditions>
+                      <add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true" />
+                    </conditions>
+                    <action type="Rewrite" url="startup.js" />
+                  </rule>
+                </rules>
+              </rewrite>
+              <iisnode 
+                nodeProcessCommandLine="node"
+                watchedFiles="*.js;iisnode.yml"
+                loggingEnabled="true"
+                logDirectory="iisnode"
+                debuggingEnabled="true"
+              />
+            </system.webServer>
+          </configuration>
+          EOF
           
           # Create a basic .env file
-          echo "NODE_ENV=production" > .env
+          echo "NODE_ENV=production" > deployment/.env
+          
+          # Install dependencies in the deployment directory
+          cd deployment
+          npm install --omit=dev
           
           # Zip everything for deployment
           zip -r ../release.zip ./*
