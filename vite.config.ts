@@ -20,6 +20,9 @@ export default defineConfig({
     outDir: path.resolve(__dirname, "dist/public"),
     emptyOutDir: true,
     sourcemap: false,
+    rollupOptions: {
+      external: [],
+    }
   },
   server: {
     port: 5173,
