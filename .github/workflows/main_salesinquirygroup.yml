@@ -19,7 +19,15 @@ jobs:
 
     - name: Install dependencies
       run: |
-        npm install
+        # Clean install to ensure all dependencies are installed
+        npm ci
+
+    - name: Verify Tailwind installation
+      run: |
+        # Check if tailwindcss is installed
+        ls -la node_modules/tailwindcss || echo "Tailwind not found"
+        # Check PostCSS config
+        cat postcss.config.cjs
 
     - name: Build application
       run: |
