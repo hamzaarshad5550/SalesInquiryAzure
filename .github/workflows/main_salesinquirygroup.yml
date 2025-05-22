@@ -31,18 +31,27 @@ jobs:
 
       - name: Install dependencies
         run: |
-          # Install terser and vite explicitly first
-          npm install --no-save terser vite
-          # Install all dependencies
-          npm ci --prefer-offline
+          # Clean npm cache
+          npm cache clean --force
+          
+          # Install all dependencies including dev dependencies
+          npm install
         env:
           NODE_OPTIONS: "--max_old_space_size=8192"
 
+      - name: Debug Vite installation
+        run: |
+          echo "Checking Vite installation..."
+          ls -la node_modules/vite
+          echo "Checking vite.config.ts..."
+          cat vite.config.ts
+          echo "Checking package.json..."
+          cat package.json
+
       - name: Build application
         run: |
-          # Use npx to ensure vite and esbuild are found
-          NODE_OPTIONS='--max_old_space_size=8192' npx vite build && \
-          NODE_OPTIONS='--max_old_space_size=8192' npx esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist
+          # Build the client first
+          NODE_OPTIONS='--max_old_space_size=8192' npm run build
         env:
           NODE_ENV: "production"
 
@@ -63,7 +72,7 @@ jobs:
             // Create a minimal package.json for production
             const prodPkg = {
               name: 'sales-inquiry-app',
-              version: pkg.version,
+              version: pkg.version || '1.0.0',
               type: 'module',
               engines: { node: '>=20.0.0' },
               scripts: {
@@ -72,20 +81,13 @@ jobs:
               dependencies: {}
             };
             
-            // Only include necessary production dependencies
-            const necessaryDeps = [
-              'express',
-              'dotenv',
-              'drizzle-orm',
-              'pg',
-              '@supabase/supabase-js'
-            ];
-            
-            for (const dep of necessaryDeps) {
-              if (pkg.dependencies && pkg.dependencies[dep]) {
-                if (!prodPkg.dependencies) prodPkg.dependencies = {};
-                prodPkg.dependencies[dep] = pkg.dependencies[dep];
-              }
+            // Include all production dependencies
+            if (pkg.dependencies) {
+              prodPkg.dependencies = { ...pkg.dependencies };
+              
+              // Remove any circular references or dev-only packages
+              delete prodPkg.dependencies['sales-inquiry-app'];
+              delete prodPkg.dependencies['rest-express'];
             }
             
             fs.writeFileSync('./deployment/package.json', JSON.stringify(prodPkg, null, 2));
@@ -130,10 +132,7 @@ jobs:
           cd deployment
           npm install --omit=dev --no-package-lock
           
-          # Remove any circular references
-          find node_modules -name "sales-inquiry-app" -type d -exec rm -rf {} +
-          
-          # Create zip for deployment (excluding node_modules)
+          # Create zip for deployment
           cd ..
           zip -r release.zip deployment/* -x "deployment/node_modules/*"
 
@@ -171,7 +170,7 @@ jobs:
           
           # List files for debugging
           ls -la
-          ls -la dist
+          ls -la dist || echo "dist directory not found"
 
       - name: Login to Azure
         uses: azure/login@v2

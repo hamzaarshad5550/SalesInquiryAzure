@@ -1,6 +1,10 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
+import { fileURLToPath } from "url";
+
+// Get the directory name in a way that works with ESM
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Check if terser is available
 let hasTerser = false;
@@ -17,10 +21,10 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      "@db": path.resolve(import.meta.dirname, "db"),
-      "@": path.resolve(import.meta.dirname, "client", "src"),
-      "@shared": path.resolve(import.meta.dirname, "shared"),
-      "@assets": path.resolve(import.meta.dirname, "attached_assets"),
+      "@db": path.resolve(__dirname, "db"),
+      "@": path.resolve(__dirname, "client", "src"),
+      "@shared": path.resolve(__dirname, "shared"),
+      "@assets": path.resolve(__dirname, "attached_assets"),
     },
   },
   optimizeDeps: {
@@ -45,9 +49,9 @@ export default defineConfig({
       "@radix-ui/react-collapsible",
     ],
   },
-  root: path.resolve(import.meta.dirname, "client"),
+  root: path.resolve(__dirname, "client"),
   build: {
-    outDir: path.resolve(import.meta.dirname, "dist/public"),
+    outDir: path.resolve(__dirname, "dist/public"),
     emptyOutDir: true,
     sourcemap: false, // Disable sourcemaps in production to save memory
     minify: hasTerser ? 'terser' : 'esbuild', // Use terser if available, otherwise esbuild
@@ -61,38 +65,7 @@ export default defineConfig({
     }),
     rollupOptions: {
       external: [],
-      output: {
-        manualChunks: {
-          // Split vendor code into chunks to improve build performance
-          'vendor': [
-            'react',
-            'react-dom',
-            'wouter' // Using wouter instead of react-router-dom
-          ],
-          'ui': [
-            '@radix-ui/react-popover',
-            '@radix-ui/react-dialog',
-            '@radix-ui/react-select',
-            '@radix-ui/react-toast',
-            '@radix-ui/react-scroll-area',
-            '@radix-ui/react-slot',
-            '@radix-ui/react-aspect-ratio',
-            '@radix-ui/react-alert-dialog',
-            '@radix-ui/react-avatar',
-            '@radix-ui/react-checkbox',
-            '@radix-ui/react-dropdown-menu',
-            '@radix-ui/react-label',
-            '@radix-ui/react-separator',
-            '@radix-ui/react-switch',
-            '@radix-ui/react-tabs',
-            '@radix-ui/react-radio-group',
-            '@radix-ui/react-progress',
-            '@radix-ui/react-collapsible'
-          ]
-        }
-      }
     },
-    chunkSizeWarningLimit: 2000, // Increase the warning limit
   },
   server: {
     port: 5173,
