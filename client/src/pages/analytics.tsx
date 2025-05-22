@@ -238,95 +238,65 @@ export default function Analytics() {
     queryKey: ['/api/dashboard/sales-performance', { period: timeRange }],
     queryFn: async () => {
       try {
-        // Try RPC first
-        try {
-          const { data, error } = await supabase.rpc('get_sales_performance_data', { 
-            p_period: timeRange 
-          });
-          
-          if (!error && data && data.length > 0) {
-            console.log("Using RPC data for sales performance:", data);
-            return { salesData: data };
-          }
-        } catch (rpcError) {
-          console.log("RPC not available, falling back to direct query");
-        }
+        // Skip the RPC attempt since it doesn't exist
+        console.log("Using direct query for sales performance data");
         
         // Fall back to direct query
         const { data: deals, error: dealsError } = await supabase
           .from('deals')
           .select('*');
         
-        if (dealsError) throw dealsError;
-        
-        if (!deals || deals.length === 0) {
-          console.log("No deals data found");
-          return { salesData: [] }; // Return empty array, not placeholder data
+        if (dealsError) {
+          console.error("Error fetching deals:", dealsError);
+          return { salesData: [] };
         }
         
-        console.log(`Processing ${deals.length} deals for performance chart`);
-        
-        // Process deals data manually
+        // Process the deals data manually
         const now = new Date();
-        const currentPeriodDeals: Record<string, number> = {};
-        const previousPeriodDeals: Record<string, number> = {};
+        const currentPeriodDeals = {};
+        const previousPeriodDeals = {};
         
         // Define period settings
         let periodOffset = 30; // Default to monthly
-        if (timeRange === 'weekly') periodOffset = 7;
-        if (timeRange === 'quarterly') periodOffset = 90;
-        if (timeRange === 'yearly') periodOffset = 365;
+        let dateFormat = { month: 'short' };
         
-        // Determine date format based on period
-        const dateFormatOptions: Intl.DateTimeFormatOptions = {
-          month: 'short',
-        };
-        
-        if (timeRange === 'weekly') {
-          dateFormatOptions.day = 'numeric';
+        if (timeRange === 'quarterly') {
+          periodOffset = 90;
+          dateFormat = { month: 'short', year: 'numeric' };
         } else if (timeRange === 'yearly') {
-          dateFormatOptions.year = 'numeric';
+          periodOffset = 365;
+          dateFormat = { year: 'numeric' };
+        } else if (timeRange === 'weekly') {
+          periodOffset = 7;
+          dateFormat = { month: 'short', day: 'numeric' };
         }
         
-        // Group deals by period
-        let processedDeals = 0;
-        deals.forEach(deal => {
-          if (!deal.created_at) return;
-          
-          const dealDate = new Date(deal.created_at);
-          const formattedDate = new Intl.DateTimeFormat('en-US', dateFormatOptions).format(dealDate);
+        // Filter closed deals - adapt this to your schema
+        const closedDeals = deals.filter(deal => 
+          deal.status === 'closed_won' || 
+          deal.stage === 5 || 
+          deal.stageId === 5
+        );
+        
+        // Process deals
+        closedDeals.forEach(deal => {
+          const dealDate = new Date(deal.created_at || deal.createdAt);
+          const formattedDate = new Intl.DateTimeFormat('en-US', dateFormat).format(dealDate);
           const daysDiff = Math.floor((now.getTime() - dealDate.getTime()) / (1000 * 60 * 60 * 24));
-          
-          // Check if deal is won (using either status or stage field)
-          const isWon = 
-            (deal.status === 'closed_won') || 
-            (deal.stage === 5) || 
-            (deal.status === 'won') ||
-            (typeof deal.status === 'string' && deal.status.toLowerCase().includes('won'));
-          
-          if (!isWon) return;
-          
-          const dealValue = Number(deal.value || 0);
-          if (isNaN(dealValue) || dealValue === 0) return;
-          
-          processedDeals++;
           
           if (daysDiff <= periodOffset) {
             // Current period
-            currentPeriodDeals[formattedDate] = (currentPeriodDeals[formattedDate] || 0) + dealValue;
+            currentPeriodDeals[formattedDate] = (currentPeriodDeals[formattedDate] || 0) + Number(deal.value);
           } else if (daysDiff <= periodOffset * 2) {
             // Previous period
-            previousPeriodDeals[formattedDate] = (previousPeriodDeals[formattedDate] || 0) + dealValue;
+            previousPeriodDeals[formattedDate] = (previousPeriodDeals[formattedDate] || 0) + Number(deal.value);
           }
         });
-        
-        console.log(`Processed ${processedDeals} won deals with values`);
-        console.log("Current period data points:", Object.keys(currentPeriodDeals).length);
-        console.log("Previous period data points:", Object.keys(previousPeriodDeals).length);
         
         // Format for chart
         const salesData = Object.keys({ ...currentPeriodDeals, ...previousPeriodDeals })
           .sort((a, b) => {
+            // Sort dates properly
             const dateA = new Date(a);
             const dateB = new Date(b);
             return dateA.getTime() - dateB.getTime();
@@ -378,59 +348,89 @@ export default function Analytics() {
     queryKey: ['/api/dashboard/lead-sources', { period: timeRange }],
     queryFn: async () => {
       try {
-        // First try to get data from the RPC if it exists
-        try {
-          const { data: rpcData, error: rpcError } = await supabase.rpc('get_lead_sources', {
-            p_period: timeRange
-          });
-          
-          // If RPC exists and works, use that data
-          if (!rpcError && rpcData) {
-            return rpcData.map((source: any, index: number) => ({
-              name: source.source || 'Unknown',
-              value: source.count,
-              color: COLORS[index % COLORS.length]
-            }));
+        // Skip the RPC attempt since it doesn't exist
+        console.log("Using direct query for lead sources");
+        
+        // First check if the source column exists
+        const { data: columnInfo, error: columnError } = await supabase
+          .from('contacts')
+          .select()
+          .limit(1);
+        
+        // Determine which field to use for source
+        let sourceField = 'source';
+        if (columnError || (columnInfo && columnInfo.length > 0 && !('source' in columnInfo[0]))) {
+          // Try alternative field names
+          const possibleFields = ['lead_source', 'leadSource', 'source_type', 'sourceType', 'origin'];
+          for (const field of possibleFields) {
+            if (columnInfo && columnInfo.length > 0 && field in columnInfo[0]) {
+              sourceField = field;
+              console.log(`Using '${field}' as source field`);
+              break;
+            }
           }
-        } catch (rpcError) {
-          console.log("RPC not available, falling back to direct query");
         }
         
-        // Otherwise fall back to direct query
-        const { data, error } = await supabase
+        // Query contacts with the appropriate field
+        const { data: contacts, error } = await supabase
           .from('contacts')
-          .select('*');
+          .select(`*, ${sourceField}, created_at`);
         
-        if (error) throw error;
+        if (error) {
+          console.error("Error fetching contacts:", error);
+          return [];
+        }
         
-        // Check if source column exists
-        const hasSourceColumn = data.length > 0 && 'source' in data[0];
+        // Filter by time range
+        const now = new Date();
+        let timeFilter = 30; // Default to monthly
         
-        // Process data
-        const sourceCount: Record<string, number> = {};
+        if (timeRange === 'quarterly') {
+          timeFilter = 90;
+        } else if (timeRange === 'yearly') {
+          timeFilter = 365;
+        } else if (timeRange === 'weekly') {
+          timeFilter = 7;
+        }
         
-        data.forEach(contact => {
-          // Use source if it exists, otherwise use a default value
-          const source = hasSourceColumn ? (contact.source || 'Unknown') : 'Unknown';
+        const filteredContacts = contacts.filter(contact => {
+          const contactDate = new Date(contact.created_at || contact.createdAt);
+          const daysDiff = Math.floor((now.getTime() - contactDate.getTime()) / (1000 * 60 * 60 * 24));
+          return daysDiff <= timeFilter;
+        });
+        
+        // Count by source
+        const sourceCount = {};
+        filteredContacts.forEach(contact => {
+          // Try to get the source using the determined field or fallbacks
+          const source = contact[sourceField] || 
+                        contact.source || 
+                        contact.lead_source || 
+                        contact.leadSource || 
+                        'Unknown';
+          
           sourceCount[source] = (sourceCount[source] || 0) + 1;
         });
         
         // Format for chart
+        const COLORS = [
+          "hsl(var(--primary))",
+          "hsl(var(--secondary))",
+          "hsl(var(--accent))",
+          "hsl(var(--destructive))",
+          "hsl(var(--success))"
+        ];
+        
         return Object.entries(sourceCount)
-          .map(([name, value], index) => ({
-            name,
-            value,
+          .map(([source, count], index) => ({
+            name: source || 'Unknown',
+            value: count,
             color: COLORS[index % COLORS.length]
-          }));
+          }))
+          .sort((a, b) => b.value - a.value);
       } catch (error) {
         console.error("Error fetching lead sources:", error);
-        // Return sample data as fallback
-        return [
-          { name: 'Website', value: 45, color: COLORS[0] },
-          { name: 'Referral', value: 30, color: COLORS[1] },
-          { name: 'Social', value: 15, color: COLORS[2] },
-          { name: 'Email', value: 10, color: COLORS[3] }
-        ];
+        return []; // Return empty array
       }
     },
     retry: 2
@@ -441,56 +441,91 @@ export default function Analytics() {
     queryKey: ['/api/dashboard/top-sales', { period: timeRange }],
     queryFn: async () => {
       try {
-        // First try to get data from the RPC if it exists
-        try {
-          const { data: rpcData, error: rpcError } = await supabase.rpc('get_top_sales_performers', {
-            p_period: timeRange
-          });
-          
-          // If RPC exists and works, use that data
-          if (!rpcError && rpcData) {
-            return { performers: rpcData || [] };
+        // Skip the RPC attempt since it doesn't exist
+        console.log("Using direct query for top sales performers");
+        
+        // First check the users table structure
+        const { data: userSample, error: userSampleError } = await supabase
+          .from('users')
+          .select('*')
+          .limit(1);
+        
+        // Determine which field to use for user name
+        let nameField = 'name';
+        if (userSample && userSample.length > 0) {
+          // Check available name fields in order of preference
+          const possibleFields = ['full_name', 'fullName', 'name', 'display_name', 'displayName', 'username'];
+          for (const field of possibleFields) {
+            if (field in userSample[0]) {
+              nameField = field;
+              console.log(`Using '${field}' as user name field`);
+              break;
+            }
           }
-        } catch (rpcError) {
-          console.log("RPC not available, falling back to direct query");
         }
         
-        // Otherwise fall back to direct queries
+        // Get all users
         const { data: users, error: usersError } = await supabase
           .from('users')
           .select('*');
         
-        if (usersError) throw usersError;
+        if (usersError) {
+          console.error("Error fetching users:", usersError);
+          return { performers: [] };
+        }
         
+        // Get all deals
         const { data: deals, error: dealsError } = await supabase
           .from('deals')
           .select('*');
         
-        if (dealsError) throw dealsError;
+        if (dealsError) {
+          console.error("Error fetching deals:", dealsError);
+          return { performers: [] };
+        }
         
-        // Check if users have full_name column
-        const hasFullNameColumn = users.length > 0 && 'full_name' in users[0];
-        const nameField = hasFullNameColumn ? 'full_name' : 'name'; // Try 'name' as fallback
-        
-        // Filter deals by period if needed
+        // Filter deals by time range and status
         const now = new Date();
-        let periodDays = 30; // Default to monthly
-        if (timeRange === 'weekly') periodDays = 7;
-        if (timeRange === 'quarterly') periodDays = 90;
-        if (timeRange === 'yearly') periodDays = 365;
+        let timeFilter = 30; // Default to monthly
+        
+        if (timeRange === 'quarterly') {
+          timeFilter = 90;
+        } else if (timeRange === 'yearly') {
+          timeFilter = 365;
+        } else if (timeRange === 'weekly') {
+          timeFilter = 7;
+        }
+        
+        // Determine which field to use for owner ID
+        let ownerIdField = 'owner_id';
+        if (deals.length > 0) {
+          if ('ownerId' in deals[0]) {
+            ownerIdField = 'ownerId';
+          }
+        }
+        
+        // Determine which field to use for deal status/stage
+        let isClosedWonDeal = (deal) => {
+          // Try different possible field combinations
+          return (
+            deal.status === 'closed_won' ||
+            deal.stage === 5 ||
+            deal.stageId === 5 ||
+            deal.stage_id === 5
+          );
+        };
         
         const filteredDeals = deals.filter(deal => {
-          if (!deal.created_at) return false;
-          const dealDate = new Date(deal.created_at);
+          const dealDate = new Date(deal.created_at || deal.createdAt);
           const daysDiff = Math.floor((now.getTime() - dealDate.getTime()) / (1000 * 60 * 60 * 24));
-          return daysDiff <= periodDays;
+          return daysDiff <= timeFilter && isClosedWonDeal(deal);
         });
         
         // Group deals by owner and calculate totals
-        const performerMap: Record<string, { id: number, name: string, deals: number, revenue: number }> = {};
+        const performerMap = {};
         
         filteredDeals.forEach(deal => {
-          const ownerId = deal.owner_id || deal.ownerId || 0;
+          const ownerId = deal[ownerIdField] || 0;
           const owner = users.find(user => user.id === ownerId);
           
           if (!performerMap[ownerId]) {
@@ -513,16 +548,7 @@ export default function Analytics() {
         };
       } catch (error) {
         console.error("Error fetching top sales performers:", error);
-        // Return sample data as fallback
-        return { 
-          performers: [
-            { id: 1, name: 'John Doe', deals: 12, revenue: 45000 },
-            { id: 2, name: 'Jane Smith', deals: 10, revenue: 38000 },
-            { id: 3, name: 'Robert Johnson', deals: 8, revenue: 32000 },
-            { id: 4, name: 'Emily Davis', deals: 7, revenue: 28000 },
-            { id: 5, name: 'Michael Wilson', deals: 6, revenue: 24000 }
-          ]
-        };
+        return { performers: [] };
       }
     },
     retry: 2

@@ -2,38 +2,59 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
-// Add memory usage optimization near the top of the file
+// Enhanced memory management
 // This helps prevent memory leaks and excessive memory usage
 if (process.env.NODE_ENV === 'production') {
   // Force garbage collection when memory usage gets high
   try {
-    const memoryUsage = process.memoryUsage();
-    console.log('Memory usage at startup:', {
-      rss: `${Math.round(memoryUsage.rss / 1024 / 1024)} MB`,
-      heapTotal: `${Math.round(memoryUsage.heapTotal / 1024 / 1024)} MB`,
-      heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)} MB`,
-      external: `${Math.round(memoryUsage.external / 1024 / 1024)} MB`
-    });
+    // Log initial memory usage
+    const formatMemoryUsage = (data) => `${Math.round(data / 1024 / 1024)} MB`;
+    const memoryData = process.memoryUsage();
     
-    // Set up periodic memory logging
-    setInterval(() => {
-      const memoryUsage = process.memoryUsage();
-      console.log('Current memory usage:', {
-        rss: `${Math.round(memoryUsage.rss / 1024 / 1024)} MB`,
-        heapTotal: `${Math.round(memoryUsage.heapTotal / 1024 / 1024)} MB`,
-        heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)} MB`,
-        external: `${Math.round(memoryUsage.external / 1024 / 1024)} MB`
-      });
+    console.log('Memory usage at startup:');
+    console.log(`RSS: ${formatMemoryUsage(memoryData.rss)} | Total: ${formatMemoryUsage(memoryData.heapTotal)} | Used: ${formatMemoryUsage(memoryData.heapUsed)}`);
+    
+    // Set up periodic memory monitoring and cleanup
+    const memoryMonitor = setInterval(() => {
+      const memoryData = process.memoryUsage();
       
-      // Suggest garbage collection if memory usage is high
-      if (memoryUsage.heapUsed > 3 * 1024 * 1024 * 1024) { // 3GB
-        console.log('High memory usage detected, suggesting garbage collection');
+      // Log memory usage periodically
+      console.log('Current memory usage:');
+      console.log(`RSS: ${formatMemoryUsage(memoryData.rss)} | Total: ${formatMemoryUsage(memoryData.heapTotal)} | Used: ${formatMemoryUsage(memoryData.heapUsed)}`);
+      
+      // Calculate memory usage percentage
+      const memoryUsagePercent = (memoryData.heapUsed / memoryData.heapTotal) * 100;
+      
+      // If memory usage is above 85%, try to free memory
+      if (memoryUsagePercent > 85) {
+        console.log(`High memory usage detected: ${memoryUsagePercent.toFixed(2)}%`);
+        
+        // Try to force garbage collection if available
         if (global.gc) {
+          console.log('Forcing garbage collection');
           global.gc();
-          console.log('Garbage collection completed');
+          
+          // Log memory after garbage collection
+          const afterGCMemory = process.memoryUsage();
+          console.log('Memory after garbage collection:');
+          console.log(`RSS: ${formatMemoryUsage(afterGCMemory.rss)} | Total: ${formatMemoryUsage(afterGCMemory.heapTotal)} | Used: ${formatMemoryUsage(afterGCMemory.heapUsed)}`);
+        } else {
+          console.log('Garbage collection not exposed. Run with --expose-gc flag to enable manual garbage collection.');
         }
       }
-    }, 60000); // Check every minute
+    }, 30000); // Check every 30 seconds
+    
+    // Clean up the interval on process exit
+    process.on('SIGTERM', () => {
+      console.log('SIGTERM received, clearing memory monitor');
+      clearInterval(memoryMonitor);
+    });
+    
+    process.on('SIGINT', () => {
+      console.log('SIGINT received, clearing memory monitor');
+      clearInterval(memoryMonitor);
+    });
+    
   } catch (e) {
     console.error('Error setting up memory monitoring:', e);
   }
