@@ -35,25 +35,23 @@ jobs:
           NODE_OPTIONS: "--max_old_space_size=8192"
 
       - name: Build application
-        run: npm run build
+        run: |
+          # Use NODE_OPTIONS directly instead of cross-env
+          NODE_OPTIONS="--max_old_space_size=8192" npm run build
         env:
           NODE_ENV: production
-          NODE_OPTIONS: "--max_old_space_size=8192"
 
       - name: Create deployment package
         run: |
-          # Extract original dependencies from package.json
-          DEPS=$(node -e "const pkg = require('./package.json'); console.log(JSON.stringify(pkg.dependencies || {}))")
-          DEV_DEPS=$(node -e "const pkg = require('./package.json'); console.log(JSON.stringify(pkg.devDependencies || {}))")
-          
           # Create a production-ready package
           mkdir -p deployment
           
           # Copy built files and necessary assets
           cp -r dist deployment/
           
-          # Copy original package.json but modify it for production
+          # Copy package.json and modify it for production
           node --max_old_space_size=8192 -e "
+            const fs = require('fs');
             const pkg = require('./package.json');
             
             // Keep only what's needed for production
@@ -61,7 +59,7 @@ jobs:
               name: pkg.name,
               version: pkg.version,
               type: pkg.type,
-              engines: pkg.engines,
+              engines: { node: '~20' },
               scripts: {
                 start: 'node dist/index.js'
               },
@@ -73,7 +71,7 @@ jobs:
             delete newPkg.optionalDependencies;
             
             // Write the modified package.json
-            require('fs').writeFileSync('./deployment/package.json', JSON.stringify(newPkg, null, 2));
+            fs.writeFileSync('./deployment/package.json', JSON.stringify(newPkg, null, 2));
           "
           
           # Create a startup file for Azure
@@ -87,8 +85,13 @@ jobs:
           console.log('NODE_ENV:', process.env.NODE_ENV);
           console.log('PORT:', process.env.PORT);
           console.log('Current directory:', process.cwd());
-          console.log('Files in directory:', require('fs').readdirSync('.'));
-          console.log('Files in dist directory:', require('fs').readdirSync('./dist'));
+          
+          try {
+            console.log('Files in directory:', require('fs').readdirSync('.'));
+            console.log('Files in dist directory:', require('fs').readdirSync('./dist'));
+          } catch (err) {
+            console.error('Error listing files:', err);
+          }
           
           // Start the application
           const app = spawn('node', ['dist/index.js'], {
@@ -132,6 +135,13 @@ jobs:
                 loggingEnabled="true"
                 logDirectory="iisnode"
                 debuggingEnabled="true"
+                maxConcurrentRequestsPerProcess="1024"
+                maxNamedPipeConnectionRetry="100"
+                namedPipeConnectionRetryDelay="250"
+                maxNamedPipeConnectionPoolSize="512"
+                maxNamedPipePooledConnectionAge="30000"
+                initialRequestBufferSize="4096"
+                maxRequestBufferSize="65536"
               />
             </system.webServer>
           </configuration>
