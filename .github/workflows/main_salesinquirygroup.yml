@@ -31,8 +31,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          # Install terser explicitly first
-          npm install --no-save terser
+          # Install terser and vite explicitly first
+          npm install --no-save terser vite
           # Install all dependencies
           npm ci --prefer-offline
         env:
@@ -40,10 +40,10 @@ jobs:
 
       - name: Build application
         run: |
-          # Build the application with increased memory
-          npm run build
+          # Use npx to ensure vite and esbuild are found
+          NODE_OPTIONS='--max_old_space_size=8192' npx vite build && \
+          NODE_OPTIONS='--max_old_space_size=8192' npx esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist
         env:
-          NODE_OPTIONS: "--max_old_space_size=8192"
           NODE_ENV: "production"
 
       - name: Prepare deployment package
@@ -82,7 +82,8 @@ jobs:
             ];
             
             for (const dep of necessaryDeps) {
-              if (pkg.dependencies[dep]) {
+              if (pkg.dependencies && pkg.dependencies[dep]) {
+                if (!prodPkg.dependencies) prodPkg.dependencies = {};
                 prodPkg.dependencies[dep] = pkg.dependencies[dep];
               }
             }
@@ -129,8 +130,8 @@ jobs:
           cd deployment
           npm install --omit=dev --no-package-lock
           
-          # Remove any node_modules/rest-express circular references
-          find node_modules -name "rest-express" -type d -exec rm -rf {} +
+          # Remove any circular references
+          find node_modules -name "sales-inquiry-app" -type d -exec rm -rf {} +
           
           # Create zip for deployment (excluding node_modules)
           cd ..
