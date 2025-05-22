@@ -23,13 +23,6 @@ jobs:
           node-version: '20.x'
           cache: 'npm'
 
-      - name: Free up disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /usr/local/share/boost
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-
       - name: Install dependencies
         run: npm ci
         env:
@@ -48,6 +41,7 @@ jobs:
           
           # Copy built files
           cp -r dist deployment/
+          cp web.config deployment/
           
           # Create a minimal package.json with start script and runtime dependencies
           cat > deployment/package.json << EOF
@@ -59,14 +53,15 @@ jobs:
               "node": ">=20.0.0"
             },
             "scripts": {
-              "start": "NODE_ENV=production node dist/index.js"
+              "start": "node dist/azure-entry.js"
             },
             "dependencies": {
               "express": "^4.18.2",
-              "dotenv": "^16.5.0",
-              "pg": "^8.16.0",
-              "drizzle-orm": "^0.43.1",
-              "@supabase/supabase-js": "^2.49.4"
+              "lucide-react": "^0.511.0",
+              "react": "^18.2.0",
+              "react-dom": "^18.2.0",
+              "react-icons": "^5.5.0",
+              "wouter": "^3.7.0"
             }
           }
           EOF
@@ -75,11 +70,13 @@ jobs:
           cd deployment
           npm install --no-package-lock --production
           
-          # Create web.config for Azure
-          echo '<?xml version="1.0" encoding="utf-8"?><configuration><system.webServer><handlers><add name="iisnode" path="dist/index.js" verb="*" modules="iisnode" /></handlers><rewrite><rules><rule name="nodejs"><match url="(.*)" /><conditions><add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true" /></conditions><action type="Rewrite" url="dist/index.js" /></rule></rules></rewrite><security><requestFiltering removeServerHeader="true" /></security></system.webServer></configuration>' > web.config
+          # Create a startup script for Azure
+          echo "console.log('Starting application...');" > startup.js
+          echo "import('./dist/azure-entry.js').catch(err => console.error('Failed to start:', err));" >> startup.js
           
           # Create a basic .env file
           echo "NODE_ENV=production" > .env
+          echo "PORT=8080" >> .env
           
           # Zip everything for deployment
           zip -r ../release.zip ./*
@@ -137,7 +134,7 @@ jobs:
               },
               {
                 "name": "PORT",
-                "value": "5000"
+                "value": "8080"
               },
               {
                 "name": "WEBSITE_NODE_DEFAULT_VERSION",
@@ -146,10 +143,6 @@ jobs:
               {
                 "name": "SCM_DO_BUILD_DURING_DEPLOYMENT",
                 "value": "false"
-              },
-              {
-                "name": "WEBSITE_MEMORY_LIMIT_MB",
-                "value": "2048"
               },
               {
                 "name": "WEBSITE_RUN_FROM_PACKAGE",

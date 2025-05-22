@@ -27,14 +27,21 @@ try {
 
 // Import and start the main server
 try {
-  const serverModule = await import('./index.js');
-  console.log('Server module loaded successfully');
+  const serverPath = resolve(process.cwd(), 'dist', 'index.js');
+  console.log('Loading server from:', serverPath);
+  
+  // Import the server module
+  import(serverPath)
+    .then(() => {
+      console.log('Server module loaded successfully');
+    })
+    .catch(err => {
+      console.error('Failed to load server module:', err);
+      process.exit(1);
+    });
 } catch (err) {
-  console.error('Failed to load server module:', err);
+  console.error('Error starting server:', err);
   process.exit(1);
 }
-
-
-
 
 
