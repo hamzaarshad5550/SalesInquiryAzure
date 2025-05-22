@@ -43,25 +43,33 @@ jobs:
 
       - name: Create deployment package
         run: |
-          # Create a production-ready package with smaller footprint
+          # Create a production-ready package
           mkdir -p deployment
           
-          # Copy only necessary files
+          # Copy built files
           cp -r dist deployment/
-          cp package.json package-lock.json deployment/
           
-          # Create a temporary package.json with fixed esbuild version
+          # Create a minimal package.json with only what's needed to run the app
+          cat > deployment/package.json << EOF
+          {
+            "name": "sales-inquiry-azure",
+            "version": "1.0.0",
+            "type": "module",
+            "engines": {
+              "node": ">=20.0.0"
+            },
+            "dependencies": {
+              "express": "^4.18.2",
+              "dotenv": "^16.5.0",
+              "pg": "^8.16.0",
+              "drizzle-orm": "^0.43.1"
+            }
+          }
+          EOF
+          
+          # Install only the essential dependencies
           cd deployment
-          # Modify package.json to pin esbuild version
-          node -e "
-            const pkg = require('./package.json');
-            if (!pkg.resolutions) pkg.resolutions = {};
-            pkg.resolutions['esbuild'] = '0.18.20';
-            require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2));
-          "
-          
-          # Install production dependencies with npm instead of npm ci to respect resolutions
-          npm install --only=production --no-optional --prefer-offline --no-audit
+          npm install --no-package-lock --production
           
           # Create web.config for Azure
           echo '<?xml version="1.0" encoding="utf-8"?><configuration><system.webServer><handlers><add name="iisnode" path="dist/index.js" verb="*" modules="iisnode" /></handlers><rewrite><rules><rule name="nodejs"><match url="(.*)" /><conditions><add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true" /></conditions><action type="Rewrite" url="dist/index.js" /></rule></rules></rewrite><security><requestFiltering removeServerHeader="true" /></security></system.webServer></configuration>' > web.config
@@ -69,8 +77,8 @@ jobs:
           # Create a basic .env file
           echo "NODE_ENV=production" > .env
           
-          # Zip everything for deployment with compression to reduce size
-          zip -r ../release.zip ./* -9
+          # Zip everything for deployment
+          zip -r ../release.zip ./*
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
