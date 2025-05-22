@@ -10,7 +10,7 @@ const __dirname = dirname(__filename);
 // Log environment information
 console.log('Starting server in Azure environment');
 console.log('NODE_ENV:', process.env.NODE_ENV);
-console.log('PORT:', process.env.PORT || 5000);
+console.log('PORT:', process.env.PORT || 8080);
 
 // Check if we're running in Azure
 const isAzure = process.env.WEBSITE_SITE_NAME !== undefined;
@@ -33,3 +33,8 @@ try {
   console.error('Failed to load server module:', err);
   process.exit(1);
 }
+
+
+
+
+

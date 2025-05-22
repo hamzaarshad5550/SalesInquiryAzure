@@ -1,4 +1,4 @@
-name: Build and deploy Node.js app to Azure Web App - SalesInquiryGroup
+name: Build and deploy to Azure App Service - SalesInquiryGroup
 
 on:
   push:
@@ -13,114 +13,90 @@ jobs:
       contents: read
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
-      - name: Set up Node.js version
+      - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20.x'
           cache: 'npm'
 
-      # Increase Node.js memory limit significantly
-      - name: Configure Node options
+      - name: Configure memory limits
         run: |
-          echo "NODE_OPTIONS=--max_old_space_size=12288" >> $GITHUB_ENV
-          echo "Memory limit increased to 12GB"
+          echo "NODE_OPTIONS=--max_old_space_size=8192" >> $GITHUB_ENV
+          echo "Memory limit increased to 8GB"
 
       - name: Install dependencies
         run: |
-          # Install terser explicitly
+          # Install terser explicitly first
           npm install --no-save terser
-          # Use smaller dependency set if possible
-          npm ci --no-audit --prefer-offline --production=false
+          # Install all dependencies
+          npm ci --prefer-offline
         env:
-          NODE_OPTIONS: "--max_old_space_size=12288"
+          NODE_OPTIONS: "--max_old_space_size=8192"
 
-      - name: Build application in chunks
+      - name: Build application
         run: |
-          # Use a memory-optimized build approach
-          NODE_OPTIONS="--max_old_space_size=12288" npm run build
+          # Build the application with increased memory
+          npm run build
         env:
-          NODE_ENV: production
+          NODE_OPTIONS: "--max_old_space_size=8192"
+          NODE_ENV: "production"
 
-      - name: Create deployment package
+      - name: Prepare deployment package
         run: |
-          # Create a production-ready package
+          # Create a clean deployment directory
           mkdir -p deployment
           
-          # Copy built files and necessary assets
+          # Copy only necessary files
           cp -r dist deployment/
+          cp package.json deployment/
           
-          # Copy package.json and modify it for production
-          node --max_old_space_size=12288 -e "
+          # Create a clean package.json for production
+          node -e "
             const fs = require('fs');
-            const pkg = require('./package.json');
+            const pkg = JSON.parse(fs.readFileSync('./package.json', 'utf8'));
             
-            // Keep only what's needed for production
-            const newPkg = {
-              name: pkg.name,
+            // Create a minimal package.json for production
+            const prodPkg = {
+              name: 'sales-inquiry-app',
               version: pkg.version,
-              type: pkg.type,
-              engines: { node: '~20' },
+              type: 'module',
+              engines: { node: '>=20.0.0' },
               scripts: {
-                start: 'node --max-old-space-size=4096 dist/index.js'
+                start: 'node dist/index.js'
               },
-              dependencies: pkg.dependencies
+              dependencies: {}
             };
             
-            // Remove dev dependencies
-            delete newPkg.devDependencies;
-            delete newPkg.optionalDependencies;
+            // Only include necessary production dependencies
+            const necessaryDeps = [
+              'express',
+              'dotenv',
+              'drizzle-orm',
+              'pg',
+              '@supabase/supabase-js'
+            ];
             
-            // Write the modified package.json
-            fs.writeFileSync('./deployment/package.json', JSON.stringify(newPkg, null, 2));
+            for (const dep of necessaryDeps) {
+              if (pkg.dependencies[dep]) {
+                prodPkg.dependencies[dep] = pkg.dependencies[dep];
+              }
+            }
+            
+            fs.writeFileSync('./deployment/package.json', JSON.stringify(prodPkg, null, 2));
           "
           
-          # Create a startup file for Azure with memory optimization
-          cat > deployment/startup.js << EOF
-          // startup.js - Azure startup script with memory optimization
-          const { spawn } = require('child_process');
-          const path = require('path');
-          
-          // Log the environment for debugging
-          console.log('Starting application with environment:');
-          console.log('NODE_ENV:', process.env.NODE_ENV);
-          console.log('PORT:', process.env.PORT);
-          console.log('Current directory:', process.cwd());
-          
-          try {
-            console.log('Files in directory:', require('fs').readdirSync('.'));
-            console.log('Files in dist directory:', require('fs').readdirSync('./dist'));
-          } catch (err) {
-            console.error('Error listing files:', err);
-          }
-          
-          // Start the application with memory optimization
-          const app = spawn('node', ['--max-old-space-size=4096', 'dist/index.js'], {
-            stdio: 'inherit',
-            env: { ...process.env, NODE_ENV: 'production' }
-          });
-          
-          app.on('error', (err) => {
-            console.error('Failed to start application:', err);
-            process.exit(1);
-          });
-          
-          app.on('exit', (code) => {
-            console.log('Application exited with code:', code);
-            process.exit(code);
-          });
-          EOF
-          
-          # Create web.config for Azure with memory settings
+          # Create web.config for Azure
           cat > deployment/web.config << EOF
           <?xml version="1.0" encoding="utf-8"?>
           <configuration>
             <system.webServer>
               <handlers>
-                <add name="iisnode" path="startup.js" verb="*" modules="iisnode" />
+                <add name="iisnode" path="dist/index.js" verb="*" modules="iisnode" />
               </handlers>
               <rewrite>
                 <rules>
@@ -129,7 +105,7 @@ jobs:
                     <conditions>
                       <add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true" />
                     </conditions>
-                    <action type="Rewrite" url="startup.js" />
+                    <action type="Rewrite" url="dist/index.js" />
                   </rule>
                 </rules>
               </rewrite>
@@ -138,30 +114,29 @@ jobs:
                 watchedFiles="*.js;iisnode.yml"
                 loggingEnabled="true"
                 logDirectory="iisnode"
-                debuggingEnabled="true"
-                maxConcurrentRequestsPerProcess="1024"
-                maxNamedPipeConnectionRetry="100"
-                namedPipeConnectionRetryDelay="250"
-                maxNamedPipeConnectionPoolSize="512"
-                maxNamedPipePooledConnectionAge="30000"
-                initialRequestBufferSize="4096"
-                maxRequestBufferSize="65536"
               />
             </system.webServer>
           </configuration>
           EOF
           
-          # Create a basic .env file
-          echo "NODE_ENV=production" > deployment/.env
+          # Create .env file with production settings
+          cat > deployment/.env << EOF
+          NODE_ENV=production
+          PORT=8080
+          EOF
           
-          # Install dependencies in the deployment directory
+          # Install only the necessary production dependencies
           cd deployment
-          npm install --omit=dev --no-audit --prefer-offline
+          npm install --omit=dev --no-package-lock
           
-          # Zip everything for deployment
-          zip -r ../release.zip ./*
+          # Remove any node_modules/rest-express circular references
+          find node_modules -name "rest-express" -type d -exec rm -rf {} +
+          
+          # Create zip for deployment (excluding node_modules)
+          cd ..
+          zip -r release.zip deployment/* -x "deployment/node_modules/*"
 
-      - name: Upload artifact for deployment job
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: node-app
@@ -179,14 +154,24 @@ jobs:
       contents: read
 
     steps:
-      - name: Download artifact from build job
+      - name: Download artifact
         uses: actions/download-artifact@v4
         with:
           name: node-app
 
-      - name: Unzip artifact for deployment
-        run: unzip release.zip
-      
+      - name: Unzip artifact
+        run: |
+          mkdir -p app
+          unzip -o release.zip -d app
+          cd app/deployment
+          
+          # Install dependencies on the deployment machine
+          npm install --omit=dev --no-package-lock
+          
+          # List files for debugging
+          ls -la
+          ls -la dist
+
       - name: Login to Azure
         uses: azure/login@v2
         with:
@@ -194,15 +179,15 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_D814736B79FA4FBC95BEDB87DF16ECCF }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_51420C1A3F184E88ADC3E862DB86A4EF }}
 
-      - name: 'Deploy to Azure Web App'
+      - name: Deploy to Azure Web App
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'SalesInquiryGroup'
           slot-name: 'Production'
-          package: .
+          package: app/deployment
           
-      - name: Set App Settings
+      - name: Configure App Settings
         uses: azure/appservice-settings@v1
         with:
           app-name: 'SalesInquiryGroup'
@@ -214,7 +199,7 @@ jobs:
               },
               {
                 "name": "PORT",
-                "value": "5000"
+                "value": "8080"
               },
               {
                 "name": "WEBSITE_NODE_DEFAULT_VERSION",
@@ -223,10 +208,6 @@ jobs:
               {
                 "name": "SCM_DO_BUILD_DURING_DEPLOYMENT",
                 "value": "false"
-              },
-              {
-                "name": "WEBSITE_MEMORY_LIMIT_MB",
-                "value": "4096"
               },
               {
                 "name": "WEBSITE_RUN_FROM_PACKAGE",
