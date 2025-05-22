@@ -3,22 +3,10 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 import { fileURLToPath } from "url";
 
-// Get the directory name in a way that works with ESM
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Check if terser is available
-let hasTerser = false;
-try {
-  require.resolve('terser');
-  hasTerser = true;
-} catch (e) {
-  console.warn('Terser not found, falling back to esbuild minifier');
-}
-
 export default defineConfig({
-  plugins: [
-    react(),
-  ],
+  plugins: [react()],
   resolve: {
     alias: {
       "@db": path.resolve(__dirname, "db"),
@@ -27,45 +15,11 @@ export default defineConfig({
       "@assets": path.resolve(__dirname, "attached_assets"),
     },
   },
-  optimizeDeps: {
-    include: [
-      "@radix-ui/react-popover",
-      "@radix-ui/react-dialog",
-      "@radix-ui/react-select",
-      "@radix-ui/react-toast",
-      "@radix-ui/react-scroll-area",
-      "@radix-ui/react-slot",
-      "@radix-ui/react-aspect-ratio",
-      "@radix-ui/react-alert-dialog",
-      "@radix-ui/react-avatar",
-      "@radix-ui/react-checkbox",
-      "@radix-ui/react-dropdown-menu",
-      "@radix-ui/react-label",
-      "@radix-ui/react-separator",
-      "@radix-ui/react-switch",
-      "@radix-ui/react-tabs",
-      "@radix-ui/react-radio-group",
-      "@radix-ui/react-progress",
-      "@radix-ui/react-collapsible",
-    ],
-  },
   root: path.resolve(__dirname, "client"),
   build: {
     outDir: path.resolve(__dirname, "dist/public"),
     emptyOutDir: true,
-    sourcemap: false, // Disable sourcemaps in production to save memory
-    minify: hasTerser ? 'terser' : 'esbuild', // Use terser if available, otherwise esbuild
-    ...(hasTerser && {
-      terserOptions: {
-        compress: {
-          drop_console: process.env.NODE_ENV === 'production', // Remove console logs in production
-          drop_debugger: true
-        }
-      }
-    }),
-    rollupOptions: {
-      external: [],
-    },
+    sourcemap: false,
   },
   server: {
     port: 5173,

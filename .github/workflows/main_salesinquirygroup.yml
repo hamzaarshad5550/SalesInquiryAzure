@@ -1,220 +1,107 @@
-name: Build and deploy to Azure App Service - SalesInquiryGroup
+name: Deploy to Azure
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '20.x'
-          cache: 'npm'
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20.x'
 
-      - name: Configure memory limits
-        run: |
-          echo "NODE_OPTIONS=--max_old_space_size=8192" >> $GITHUB_ENV
-          echo "Memory limit increased to 8GB"
+    - name: Install dependencies
+      run: |
+        npm install
 
-      - name: Install dependencies
-        run: |
-          # Clean npm cache
-          npm cache clean --force
-          
-          # Install all dependencies including dev dependencies
-          npm install
-        env:
-          NODE_OPTIONS: "--max_old_space_size=8192"
+    - name: Build application
+      run: |
+        npm run build
 
-      - name: Debug Vite installation
-        run: |
-          echo "Checking Vite installation..."
-          ls -la node_modules/vite
-          echo "Checking vite.config.ts..."
-          cat vite.config.ts
-          echo "Checking package.json..."
-          cat package.json
+    - name: Prepare for deployment
+      run: |
+        # Create deployment directory
+        mkdir -p deploy
+        
+        # Copy necessary files
+        cp -r dist deploy/
+        cp package.json deploy/
+        
+        # Create production package.json
+        node -e "
+          const fs = require('fs');
+          const pkg = JSON.parse(fs.readFileSync('./package.json'));
+          const deployPkg = {
+            name: pkg.name,
+            version: pkg.version,
+            type: pkg.type,
+            engines: pkg.engines,
+            scripts: { start: 'node dist/index.js' },
+            dependencies: pkg.dependencies || {}
+          };
+          fs.writeFileSync('./deploy/package.json', JSON.stringify(deployPkg, null, 2));
+        "
+        
+        # Create web.config for Azure
+        echo '<?xml version="1.0" encoding="utf-8"?>
+        <configuration>
+          <system.webServer>
+            <handlers>
+              <add name="iisnode" path="dist/index.js" verb="*" modules="iisnode" />
+            </handlers>
+            <rewrite>
+              <rules>
+                <rule name="nodejs">
+                  <match url="(.*)" />
+                  <conditions>
+                    <add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true" />
+                  </conditions>
+                  <action type="Rewrite" url="dist/index.js" />
+                </rule>
+              </rules>
+            </rewrite>
+          </system.webServer>
+        </configuration>' > deploy/web.config
+        
+        # Install production dependencies
+        cd deploy
+        npm install --omit=dev
 
-      - name: Build application
-        run: |
-          # Build the client first
-          NODE_OPTIONS='--max_old_space_size=8192' npm run build
-        env:
-          NODE_ENV: "production"
+    - name: Login to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Prepare deployment package
-        run: |
-          # Create a clean deployment directory
-          mkdir -p deployment
-          
-          # Copy only necessary files
-          cp -r dist deployment/
-          cp package.json deployment/
-          
-          # Create a clean package.json for production
-          node -e "
-            const fs = require('fs');
-            const pkg = JSON.parse(fs.readFileSync('./package.json', 'utf8'));
-            
-            // Create a minimal package.json for production
-            const prodPkg = {
-              name: 'sales-inquiry-app',
-              version: pkg.version || '1.0.0',
-              type: 'module',
-              engines: { node: '>=20.0.0' },
-              scripts: {
-                start: 'node dist/index.js'
-              },
-              dependencies: {}
-            };
-            
-            // Include all production dependencies
-            if (pkg.dependencies) {
-              prodPkg.dependencies = { ...pkg.dependencies };
-              
-              // Remove any circular references or dev-only packages
-              delete prodPkg.dependencies['sales-inquiry-app'];
-              delete prodPkg.dependencies['rest-express'];
+    - name: Deploy to Azure Web App
+      uses: azure/webapps-deploy@v2
+      with:
+        app-name: 'SalesInquiryGroup'
+        slot-name: 'Production'
+        package: './deploy'
+
+    - name: Configure App Settings
+      uses: azure/appservice-settings@v1
+      with:
+        app-name: 'SalesInquiryGroup'
+        app-settings-json: |
+          [
+            {
+              "name": "NODE_ENV",
+              "value": "production"
+            },
+            {
+              "name": "PORT",
+              "value": "8080"
+            },
+            {
+              "name": "WEBSITE_NODE_DEFAULT_VERSION",
+              "value": "~20"
             }
-            
-            fs.writeFileSync('./deployment/package.json', JSON.stringify(prodPkg, null, 2));
-          "
-          
-          # Create web.config for Azure
-          cat > deployment/web.config << EOF
-          <?xml version="1.0" encoding="utf-8"?>
-          <configuration>
-            <system.webServer>
-              <handlers>
-                <add name="iisnode" path="dist/index.js" verb="*" modules="iisnode" />
-              </handlers>
-              <rewrite>
-                <rules>
-                  <rule name="nodejs">
-                    <match url="(.*)" />
-                    <conditions>
-                      <add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true" />
-                    </conditions>
-                    <action type="Rewrite" url="dist/index.js" />
-                  </rule>
-                </rules>
-              </rewrite>
-              <iisnode 
-                nodeProcessCommandLine="node --max-old-space-size=4096"
-                watchedFiles="*.js;iisnode.yml"
-                loggingEnabled="true"
-                logDirectory="iisnode"
-              />
-            </system.webServer>
-          </configuration>
-          EOF
-          
-          # Create .env file with production settings
-          cat > deployment/.env << EOF
-          NODE_ENV=production
-          PORT=8080
-          EOF
-          
-          # Install only the necessary production dependencies
-          cd deployment
-          npm install --omit=dev --no-package-lock
-          
-          # Create zip for deployment
-          cd ..
-          zip -r release.zip deployment/* -x "deployment/node_modules/*"
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: node-app
-          path: release.zip
-          retention-days: 1
-
-  deploy:
-    runs-on: ubuntu-latest
-    needs: build
-    environment:
-      name: 'Production'
-      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
-    permissions:
-      id-token: write
-      contents: read
-
-    steps:
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: node-app
-
-      - name: Unzip artifact
-        run: |
-          mkdir -p app
-          unzip -o release.zip -d app
-          cd app/deployment
-          
-          # Install dependencies on the deployment machine
-          npm install --omit=dev --no-package-lock
-          
-          # List files for debugging
-          ls -la
-          ls -la dist || echo "dist directory not found"
-
-      - name: Login to Azure
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_886E565E15F54F64825AFC8382A0E7EA }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_D814736B79FA4FBC95BEDB87DF16ECCF }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_51420C1A3F184E88ADC3E862DB86A4EF }}
-
-      - name: Deploy to Azure Web App
-        id: deploy-to-webapp
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: 'SalesInquiryGroup'
-          slot-name: 'Production'
-          package: app/deployment
-          
-      - name: Configure App Settings
-        uses: azure/appservice-settings@v1
-        with:
-          app-name: 'SalesInquiryGroup'
-          app-settings-json: |
-            [
-              {
-                "name": "NODE_ENV",
-                "value": "production"
-              },
-              {
-                "name": "PORT",
-                "value": "8080"
-              },
-              {
-                "name": "WEBSITE_NODE_DEFAULT_VERSION",
-                "value": "~20"
-              },
-              {
-                "name": "SCM_DO_BUILD_DURING_DEPLOYMENT",
-                "value": "false"
-              },
-              {
-                "name": "WEBSITE_RUN_FROM_PACKAGE",
-                "value": "0"
-              },
-              {
-                "name": "NODE_OPTIONS",
-                "value": "--max_old_space_size=4096"
-              }
             ]
