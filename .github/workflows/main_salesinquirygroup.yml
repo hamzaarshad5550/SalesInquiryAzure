@@ -23,16 +23,22 @@ jobs:
           node-version: '20.x'
           cache: 'npm'
 
+      # Increase Node.js memory limit
+      - name: Configure Node options
+        run: |
+          echo "NODE_OPTIONS=--max_old_space_size=8192" >> $GITHUB_ENV
+          echo "Memory limit increased to 8GB"
+
       - name: Install dependencies
         run: npm ci
         env:
-          NODE_OPTIONS: "--max_old_space_size=4096"
+          NODE_OPTIONS: "--max_old_space_size=8192"
 
       - name: Build application
         run: npm run build
         env:
           NODE_ENV: production
-          NODE_OPTIONS: "--max_old_space_size=4096"
+          NODE_OPTIONS: "--max_old_space_size=8192"
 
       - name: Create deployment package
         run: |
@@ -47,7 +53,7 @@ jobs:
           cp -r dist deployment/
           
           # Copy original package.json but modify it for production
-          node -e "
+          node --max_old_space_size=8192 -e "
             const pkg = require('./package.json');
             
             // Keep only what's needed for production
@@ -206,10 +212,14 @@ jobs:
               },
               {
                 "name": "WEBSITE_MEMORY_LIMIT_MB",
-                "value": "2048"
+                "value": "4096"
               },
               {
                 "name": "WEBSITE_RUN_FROM_PACKAGE",
                 "value": "0"
+              },
+              {
+                "name": "NODE_OPTIONS",
+                "value": "--max_old_space_size=4096"
               }
             ]

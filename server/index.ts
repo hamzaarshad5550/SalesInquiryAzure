@@ -2,6 +2,43 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
+// Add memory usage optimization near the top of the file
+// This helps prevent memory leaks and excessive memory usage
+if (process.env.NODE_ENV === 'production') {
+  // Force garbage collection when memory usage gets high
+  try {
+    const memoryUsage = process.memoryUsage();
+    console.log('Memory usage at startup:', {
+      rss: `${Math.round(memoryUsage.rss / 1024 / 1024)} MB`,
+      heapTotal: `${Math.round(memoryUsage.heapTotal / 1024 / 1024)} MB`,
+      heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)} MB`,
+      external: `${Math.round(memoryUsage.external / 1024 / 1024)} MB`
+    });
+    
+    // Set up periodic memory logging
+    setInterval(() => {
+      const memoryUsage = process.memoryUsage();
+      console.log('Current memory usage:', {
+        rss: `${Math.round(memoryUsage.rss / 1024 / 1024)} MB`,
+        heapTotal: `${Math.round(memoryUsage.heapTotal / 1024 / 1024)} MB`,
+        heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)} MB`,
+        external: `${Math.round(memoryUsage.external / 1024 / 1024)} MB`
+      });
+      
+      // Suggest garbage collection if memory usage is high
+      if (memoryUsage.heapUsed > 3 * 1024 * 1024 * 1024) { // 3GB
+        console.log('High memory usage detected, suggesting garbage collection');
+        if (global.gc) {
+          global.gc();
+          console.log('Garbage collection completed');
+        }
+      }
+    }, 60000); // Check every minute
+  } catch (e) {
+    console.error('Error setting up memory monitoring:', e);
+  }
+}
+
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
