@@ -24,6 +24,14 @@ export default defineConfig({
       external: [],
     }
   },
+  optimizeDeps: {
+    include: [
+      "react",
+      "react-dom",
+      "wouter",
+      "lucide-react"
+    ]
+  },
   server: {
     port: 5173,
     strictPort: true,

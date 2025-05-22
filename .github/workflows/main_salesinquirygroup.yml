@@ -24,6 +24,7 @@ jobs:
         # Verify critical dependencies are installed
         ls -la node_modules/react || npm install react react-dom
         ls -la node_modules/wouter || npm install wouter
+        ls -la node_modules/lucide-react || npm install lucide-react
 
     - name: Build application
       run: |
@@ -53,7 +54,8 @@ jobs:
               'express': pkg.dependencies.express,
               'react': pkg.dependencies.react,
               'react-dom': pkg.dependencies['react-dom'],
-              'wouter': pkg.dependencies.wouter
+              'wouter': pkg.dependencies.wouter,
+              'lucide-react': pkg.dependencies['lucide-react']
             }
           };
           fs.writeFileSync('./deploy/package.json', JSON.stringify(deployPkg, null, 2));
