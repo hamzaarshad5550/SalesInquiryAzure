@@ -1,121 +1,158 @@
-name: Deploy to Azure
+name: Build and deploy Node.js app to Azure Web App - SalesInquiryGroup
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '20.x'
+      - name: Set up Node.js version
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20.x'
+          cache: 'npm'
 
-    - name: Install dependencies
-      run: |
-        # Clean install to ensure all dependencies are installed
-        npm ci
-        # Verify critical dependencies are installed
-        ls -la node_modules/react || npm install react react-dom
-        ls -la node_modules/wouter || npm install wouter
-        ls -la node_modules/lucide-react || npm install lucide-react
-        ls -la node_modules/react-icons || npm install react-icons
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
 
-    - name: Build application
-      run: |
-        # Build the application
-        npm run build
+      - name: Install dependencies
+        run: npm ci
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
 
-    - name: Prepare for deployment
-      run: |
-        # Create deployment directory
-        mkdir -p deploy
-        
-        # Copy necessary files
-        cp -r dist deploy/
-        cp package.json deploy/
-        
-        # Create production package.json
-        node -e "
-          const fs = require('fs');
-          const pkg = JSON.parse(fs.readFileSync('./package.json'));
-          const deployPkg = {
-            name: pkg.name,
-            version: pkg.version,
-            type: pkg.type,
-            engines: pkg.engines,
-            scripts: { start: 'node dist/index.js' },
-            dependencies: {
-              'express': pkg.dependencies.express,
-              'react': pkg.dependencies.react,
-              'react-dom': pkg.dependencies['react-dom'],
-              'wouter': pkg.dependencies.wouter,
-              'lucide-react': pkg.dependencies['lucide-react'],
-              'react-icons': pkg.dependencies['react-icons']
-            }
-          };
-          fs.writeFileSync('./deploy/package.json', JSON.stringify(deployPkg, null, 2));
-        "
-        
-        # Create web.config for Azure
-        echo '<?xml version="1.0" encoding="utf-8"?>
-        <configuration>
-          <system.webServer>
-            <handlers>
-              <add name="iisnode" path="dist/index.js" verb="*" modules="iisnode" />
-            </handlers>
-            <rewrite>
-              <rules>
-                <rule name="nodejs">
-                  <match url="(.*)" />
-                  <conditions>
-                    <add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true" />
-                  </conditions>
-                  <action type="Rewrite" url="dist/index.js" />
-                </rule>
-              </rules>
-            </rewrite>
-          </system.webServer>
-        </configuration>' > deploy/web.config
-        
-        # Install production dependencies
-        cd deploy
-        npm install --omit=dev
+      - name: Build application
+        run: npm run build
+        env:
+          NODE_ENV: production
+          NODE_OPTIONS: "--max_old_space_size=4096"
 
-    - name: Login to Azure
-      uses: azure/login@v1
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-    - name: Deploy to Azure Web App
-      uses: azure/webapps-deploy@v2
-      with:
-        app-name: 'SalesInquiryGroup'
-        slot-name: 'Production'
-        package: './deploy'
-
-    - name: Configure App Settings
-      uses: azure/appservice-settings@v1
-      with:
-        app-name: 'SalesInquiryGroup'
-        app-settings-json: |
-          [
-            {
-              "name": "NODE_ENV",
-              "value": "production"
+      - name: Create deployment package
+        run: |
+          # Create a production-ready package
+          mkdir -p deployment
+          
+          # Copy built files
+          cp -r dist deployment/
+          
+          # Create a minimal package.json with start script and runtime dependencies
+          cat > deployment/package.json << EOF
+          {
+            "name": "sales-inquiry-azure",
+            "version": "1.0.0",
+            "type": "module",
+            "engines": {
+              "node": ">=20.0.0"
             },
-            {
-              "name": "PORT",
-              "value": "8080"
+            "scripts": {
+              "start": "NODE_ENV=production node dist/index.js"
             },
-            {
-              "name": "WEBSITE_NODE_DEFAULT_VERSION",
-              "value": "~20"
+            "dependencies": {
+              "express": "^4.18.2",
+              "dotenv": "^16.5.0",
+              "pg": "^8.16.0",
+              "drizzle-orm": "^0.43.1",
+              "@supabase/supabase-js": "^2.49.4"
             }
+          }
+          EOF
+          
+          # Install only the essential dependencies
+          cd deployment
+          npm install --no-package-lock --production
+          
+          # Create web.config for Azure
+          echo '<?xml version="1.0" encoding="utf-8"?><configuration><system.webServer><handlers><add name="iisnode" path="dist/index.js" verb="*" modules="iisnode" /></handlers><rewrite><rules><rule name="nodejs"><match url="(.*)" /><conditions><add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true" /></conditions><action type="Rewrite" url="dist/index.js" /></rule></rules></rewrite><security><requestFiltering removeServerHeader="true" /></security></system.webServer></configuration>' > web.config
+          
+          # Create a basic .env file
+          echo "NODE_ENV=production" > .env
+          
+          # Zip everything for deployment
+          zip -r ../release.zip ./*
+
+      - name: Upload artifact for deployment job
+        uses: actions/upload-artifact@v4
+        with:
+          name: node-app
+          path: release.zip
+          retention-days: 1
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: 'Production'
+      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Download artifact from build job
+        uses: actions/download-artifact@v4
+        with:
+          name: node-app
+
+      - name: Unzip artifact for deployment
+        run: unzip release.zip
+      
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_886E565E15F54F64825AFC8382A0E7EA }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_D814736B79FA4FBC95BEDB87DF16ECCF }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_51420C1A3F184E88ADC3E862DB86A4EF }}
+
+      - name: 'Deploy to Azure Web App'
+        id: deploy-to-webapp
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: 'SalesInquiryGroup'
+          slot-name: 'Production'
+          package: .
+          
+      - name: Set App Settings
+        uses: azure/appservice-settings@v1
+        with:
+          app-name: 'SalesInquiryGroup'
+          app-settings-json: |
+            [
+              {
+                "name": "NODE_ENV",
+                "value": "production"
+              },
+              {
+                "name": "PORT",
+                "value": "5000"
+              },
+              {
+                "name": "WEBSITE_NODE_DEFAULT_VERSION",
+                "value": "~20"
+              },
+              {
+                "name": "SCM_DO_BUILD_DURING_DEPLOYMENT",
+                "value": "false"
+              },
+              {
+                "name": "WEBSITE_MEMORY_LIMIT_MB",
+                "value": "2048"
+              },
+              {
+                "name": "WEBSITE_RUN_FROM_PACKAGE",
+                "value": "0"
+              }
             ]
