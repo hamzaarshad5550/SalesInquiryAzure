@@ -49,7 +49,7 @@ jobs:
           # Copy built files
           cp -r dist deployment/
           
-          # Create a minimal package.json with only what's needed to run the app
+          # Create a minimal package.json with start script and runtime dependencies
           cat > deployment/package.json << EOF
           {
             "name": "sales-inquiry-azure",
@@ -58,11 +58,15 @@ jobs:
             "engines": {
               "node": ">=20.0.0"
             },
+            "scripts": {
+              "start": "NODE_ENV=production node dist/index.js"
+            },
             "dependencies": {
               "express": "^4.18.2",
               "dotenv": "^16.5.0",
               "pg": "^8.16.0",
-              "drizzle-orm": "^0.43.1"
+              "drizzle-orm": "^0.43.1",
+              "@supabase/supabase-js": "^2.49.4"
             }
           }
           EOF
@@ -146,5 +150,9 @@ jobs:
               {
                 "name": "WEBSITE_MEMORY_LIMIT_MB",
                 "value": "2048"
+              },
+              {
+                "name": "WEBSITE_RUN_FROM_PACKAGE",
+                "value": "0"
               }
             ]
