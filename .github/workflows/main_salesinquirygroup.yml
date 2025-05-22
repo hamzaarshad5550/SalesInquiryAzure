@@ -25,6 +25,7 @@ jobs:
         ls -la node_modules/react || npm install react react-dom
         ls -la node_modules/wouter || npm install wouter
         ls -la node_modules/lucide-react || npm install lucide-react
+        ls -la node_modules/react-icons || npm install react-icons
 
     - name: Build application
       run: |
@@ -55,7 +56,8 @@ jobs:
               'react': pkg.dependencies.react,
               'react-dom': pkg.dependencies['react-dom'],
               'wouter': pkg.dependencies.wouter,
-              'lucide-react': pkg.dependencies['lucide-react']
+              'lucide-react': pkg.dependencies['lucide-react'],
+              'react-icons': pkg.dependencies['react-icons']
             }
           };
           fs.writeFileSync('./deploy/package.json', JSON.stringify(deployPkg, null, 2));

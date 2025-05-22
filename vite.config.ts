@@ -29,7 +29,9 @@ export default defineConfig({
       "react",
       "react-dom",
       "wouter",
-      "lucide-react"
+      "lucide-react",
+      "react-icons",
+      "react-icons/si"
     ]
   },
   server: {
