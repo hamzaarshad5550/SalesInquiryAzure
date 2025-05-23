@@ -34,6 +34,7 @@ jobs:
           ls -la node_modules/@tanstack/react-query || npm install @tanstack/react-query
           ls -la node_modules/firebase || npm install firebase
           ls -la node_modules/gapi-script || npm install gapi-script
+          ls -la node_modules/papaparse || npm install papaparse @types/papaparse
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
@@ -70,6 +71,7 @@ jobs:
               "firebase": "^11.7.3",
               "gapi-script": "^1.2.0",
               "lucide-react": "^0.511.0",
+              "papaparse": "^5.5.2",
               "react": "^18.2.0",
               "react-dom": "^18.2.0",
               "react-icons": "^5.5.0",

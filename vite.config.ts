@@ -35,7 +35,8 @@ export default defineConfig({
       "@tanstack/react-query",
       "firebase",
       "firebase/auth",
-      "gapi-script"
+      "gapi-script",
+      "papaparse"
     ]
   },
   server: {
