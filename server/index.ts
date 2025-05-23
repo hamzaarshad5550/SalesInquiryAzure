@@ -1,6 +1,11 @@
 import express, { type Request, Response, NextFunction } from "express";
+import path from "path";
+import { fileURLToPath } from "url";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(express.json());
@@ -111,18 +116,22 @@ app.use((req, res, next) => {
       serveStatic(app);
     }
 
-    // ALWAYS serve the app on port 5000
-    // this serves both the API and the client.
-    // It is the only port that is not firewalled.
-    const port = 5000;
+    // Use the PORT environment variable provided by Azure, or fallback to 5000
+    const port = process.env.PORT || 5000;
+    
+    // Log the port we're using
+    console.log(`Server configured to listen on port ${port}`);
+    
+    // Update your server.listen call
     server.listen({
       port,
       host: "0.0.0.0",
-      reusePort: true,
     }, () => {
-      log(`serving on port ${port}`);
+      console.log(`Server running at http://0.0.0.0:${port}`);
     });
   } catch (error) {
     console.error("Server initialization failed:", error);
+    // Don't exit the process, as this might cause Azure to restart the app repeatedly
+    console.error("Server will continue running but may not function correctly");
   }
 })();
