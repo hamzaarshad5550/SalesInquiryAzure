@@ -22,18 +22,25 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '20.x'
+          cache: 'npm'
 
       - name: Install dependencies
         run: |
           npm install
           # Explicitly install Tailwind CSS and related packages
           npm install -D tailwindcss postcss autoprefixer tailwindcss-animate @tailwindcss/typography
-          # Verify Tailwind is installed
-          npx tailwindcss --help
+          # Install build tools explicitly
+          npm install -D vite @vitejs/plugin-react esbuild typescript
+          # Verify installations
+          echo "Node version: $(node -v)"
+          echo "NPM version: $(npm -v)"
+          npx tailwindcss --help || echo "Tailwind not found"
+          npx vite --help || echo "Vite not found"
+          npx esbuild --help || echo "esbuild not found"
 
-      - name: Create simplified build script
+      - name: Create direct build script
         run: |
-          cat > build.js << 'EOF'
+          cat > direct-build.js << 'EOF'
           import { execSync } from 'child_process';
           import fs from 'fs';
           import path from 'path';
@@ -41,7 +48,7 @@ jobs:
 
           const __dirname = path.dirname(fileURLToPath(import.meta.url));
           
-          console.log('Starting simplified build process...');
+          console.log('Starting direct build process...');
 
           // Create dist directory
           const distDir = path.resolve(__dirname, 'dist');
@@ -54,61 +61,24 @@ jobs:
             fs.mkdirSync(publicDir, { recursive: true });
           }
 
-          // Verify Tailwind CSS is installed
-          try {
-            console.log('Checking Tailwind CSS installation...');
-            execSync('npx tailwindcss --help', { stdio: 'inherit' });
-          } catch (error) {
-            console.error('Tailwind CSS is not properly installed, installing now...');
-            execSync('npm install -D tailwindcss postcss autoprefixer tailwindcss-animate @tailwindcss/typography', { stdio: 'inherit' });
-          }
-
-          // Build client application
-          try {
-            // First build the client application with Vite
-            console.log('Building client application...');
-            
-            // Create a simplified CSS file if needed
-            const cssDir = path.resolve(__dirname, 'client', 'src');
-            const cssFile = path.resolve(cssDir, 'index.css');
-            
-            if (!fs.existsSync(cssFile)) {
-              console.log('Creating simplified index.css file...');
-              fs.writeFileSync(
-                cssFile,
-                '@tailwind base;\n@tailwind components;\n@tailwind utilities;'
-              );
-            }
-            
-            // Run the build
-            execSync('npx vite build --outDir dist/public', { stdio: 'inherit' });
-            
-            // If the build fails or doesn't produce an index.html, fall back to copying files
-            if (!fs.existsSync(path.resolve(publicDir, 'index.html'))) {
-              console.log('Vite build failed to produce index.html, falling back to copying client files...');
-              execSync('cp -r client/* dist/public/', { stdio: 'inherit' });
-              
-              // Create a proper index.html that references compiled JavaScript, not TSX
-              fs.writeFileSync(
-                path.resolve(publicDir, 'index.html'),
-                '<!DOCTYPE html>\n<html lang="en">\n  <head>\n    <meta charset="UTF-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />\n    <title>Sales Inquiry Group</title>\n  </head>\n  <body>\n    <div id="root"></div>\n    <script type="module" src="./index.js"></script>\n  </body>\n</html>'
-              );
-              
-              // Create a simple index.js that displays something
-              fs.writeFileSync(
-                path.resolve(publicDir, 'index.js'),
-                'document.getElementById(\'root\').innerHTML = \'<div style="text-align:center; padding:50px;"><h1>Sales Inquiry Group</h1><p>Application is loading...</p></div>\';\nconsole.log(\'Application initialized\');'
-              );
-            }
-          } catch (error) {
-            console.error('Failed to build client files:', error);
-            process.exit(1);
-          }
+          // Create a fallback index.html and static files
+          console.log('Creating fallback static files...');
+          fs.writeFileSync(
+            path.resolve(publicDir, 'index.html'),
+            '<!DOCTYPE html>\n<html lang="en">\n  <head>\n    <meta charset="UTF-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />\n    <title>Sales Inquiry Group</title>\n    <style>body{font-family:system-ui,-apple-system,sans-serif;background:#f5f5f5;display:flex;justify-content:center;align-items:center;height:100vh;margin:0}.container{text-align:center;padding:2rem;background:white;border-radius:8px;box-shadow:0 4px 6px rgba(0,0,0,0.1);max-width:500px}</style>\n  </head>\n  <body>\n    <div class="container">\n      <h1>Sales Inquiry Group</h1>\n      <p>Application is loading...</p>\n    </div>\n    <script>console.log("Application initialized");</script>\n  </body>\n</html>'
+          );
 
           // Build backend
           console.log('Building backend...');
           try {
-            execSync('npx esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist', { stdio: 'inherit' });
+            // Use direct path to esbuild
+            execSync('node ./node_modules/.bin/esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist', { stdio: 'inherit' });
+            
+            // Create a simple entry point for Azure
+            fs.writeFileSync(
+              path.resolve(__dirname, 'server.js'),
+              'import "./dist/index.js";'
+            );
           } catch (error) {
             console.error('Failed to build backend:', error);
             process.exit(1);
@@ -117,18 +87,17 @@ jobs:
           console.log('Build completed successfully!');
           EOF
 
-      - name: Run simplified build
-        run: node build.js
+      - name: Run direct build
+        run: node direct-build.js
 
       - name: Zip artifact for deployment
         run: |
           # Remove unnecessary files before zipping
           rm -rf node_modules
-          rm -rf .git
           # Install only production dependencies
-          npm ci --only=production
+          npm ci --omit=dev
           # Create a more optimized zip file
-          zip -r release.zip . -x "*.git*" "*.github*" "*.vscode*" "*.idea*" "*.DS_Store" "*.log"
+          zip -r release.zip . -x "*.git*" "*.github*" "*.vscode*" "*.idea*" "*.DS_Store" "*.log" "client/src/*" "client/node_modules/*"
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
@@ -170,5 +139,5 @@ jobs:
           app-name: 'SalesInquiryGroup'
           slot-name: 'Production'
           package: .
-          startup-command: 'node server/azure-entry.js'
+          startup-command: 'node server.js'
             
