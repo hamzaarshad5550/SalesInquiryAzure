@@ -24,277 +24,11 @@ jobs:
           node-version: '20.x'
           cache: 'npm'
 
-      - name: Create build scripts directory
-        run: mkdir -p build-scripts
-
-      - name: Create build preparation script
+      - name: Create .npmrc file
         run: |
-          cat > build-scripts/prepare-build.mjs << 'EOF'
-          // ES Module compatible build preparation script
-          import fs from 'fs';
-          import path from 'path';
-          import { fileURLToPath } from 'url';
-          import { execSync } from 'child_process';
-
-          const __dirname = path.dirname(fileURLToPath(import.meta.url));
-          const rootDir = path.resolve(__dirname, '..');
-
-          console.log('Preparing build environment...');
-
-          // Ensure all Radix UI dependencies are installed
-          const radixDeps = [
-            '@radix-ui/react-slot',
-            '@radix-ui/react-popover',
-            '@radix-ui/react-dialog',
-            '@radix-ui/react-select',
-            '@radix-ui/react-toast',
-            '@radix-ui/react-scroll-area',
-            '@radix-ui/react-aspect-ratio',
-            '@radix-ui/react-alert-dialog',
-            '@radix-ui/react-avatar',
-            '@radix-ui/react-checkbox',
-            '@radix-ui/react-dropdown-menu',
-            '@radix-ui/react-label',
-            '@radix-ui/react-separator',
-            '@radix-ui/react-switch',
-            '@radix-ui/react-tabs',
-            '@radix-ui/react-radio-group',
-            '@radix-ui/react-progress',
-            '@radix-ui/react-collapsible'
-          ];
-
-          // Check if Radix UI dependencies are installed
-          for (const dep of radixDeps) {
-            try {
-              const depPath = path.join(rootDir, 'node_modules', dep);
-              if (!fs.existsSync(depPath)) {
-                console.log(`Installing missing dependency: ${dep}`);
-                execSync(`npm install ${dep}`, { stdio: 'inherit' });
-              } else {
-                console.log(`✓ ${dep} is installed`);
-              }
-            } catch (error) {
-              console.error(`Error checking/installing ${dep}:`, error);
-            }
-          }
-
-          // Ensure vite.config.ts has the correct configuration
-          const viteConfigPath = path.join(rootDir, 'vite.config.ts');
-          let viteConfig = fs.readFileSync(viteConfigPath, 'utf8');
-
-          // Check if rollupOptions.external includes Radix UI components
-          if (!viteConfig.includes('@radix-ui/react-slot')) {
-            console.log('Updating vite.config.ts to include Radix UI externals...');
-            
-            // Replace the rollupOptions section
-            viteConfig = viteConfig.replace(
-              /rollupOptions:\s*{[^}]*}/,
-              `rollupOptions: {
-                external: [
-                  '@radix-ui/react-slot',
-                  '@radix-ui/react-popover',
-                  '@radix-ui/react-dialog',
-                  '@radix-ui/react-select',
-                  '@radix-ui/react-toast',
-                  '@radix-ui/react-scroll-area',
-                  '@radix-ui/react-aspect-ratio',
-                  '@radix-ui/react-alert-dialog',
-                  '@radix-ui/react-avatar',
-                  '@radix-ui/react-checkbox',
-                  '@radix-ui/react-dropdown-menu',
-                  '@radix-ui/react-label',
-                  '@radix-ui/react-separator',
-                  '@radix-ui/react-switch',
-                  '@radix-ui/react-tabs',
-                  '@radix-ui/react-radio-group',
-                  '@radix-ui/react-progress',
-                  '@radix-ui/react-collapsible'
-                ],
-              }`
-            );
-            
-            // Update the optimizeDeps.exclude section
-            if (!viteConfig.includes('exclude: [')) {
-              viteConfig = viteConfig.replace(
-                /optimizeDeps:\s*{[^}]*}/,
-                `optimizeDeps: {
-                  include: [
-                    // Core React
-                    "react",
-                    "react-dom",
-                    "react/jsx-runtime",
-                    
-                    // Routing
-                    "wouter",
-                    
-                    // UI Components
-                    "lucide-react",
-                    "react-icons",
-                    "react-icons/si",
-                    "recharts",
-                    
-                    // Data Management
-                    "@tanstack/react-query",
-                    
-                    // Authentication
-                    "firebase",
-                    "firebase/auth",
-                    "firebase/app",
-                    "gapi-script",
-                    
-                    // Data Processing
-                    "papaparse",
-                    
-                    // Form Handling
-                    "@hookform/resolvers",
-                    "@hookform/resolvers/zod",
-                    "react-hook-form",
-                    "zod",
-                    
-                    // Date Handling
-                    "date-fns"
-                  ],
-                  exclude: [
-                    '@radix-ui/react-slot',
-                    '@radix-ui/react-popover',
-                    '@radix-ui/react-dialog',
-                    '@radix-ui/react-select',
-                    '@radix-ui/react-toast',
-                    '@radix-ui/react-scroll-area',
-                    '@radix-ui/react-aspect-ratio',
-                    '@radix-ui/react-alert-dialog',
-                    '@radix-ui/react-avatar',
-                    '@radix-ui/react-checkbox',
-                    '@radix-ui/react-dropdown-menu',
-                    '@radix-ui/react-label',
-                    '@radix-ui/react-separator',
-                    '@radix-ui/react-switch',
-                    '@radix-ui/react-tabs',
-                    '@radix-ui/react-radio-group',
-                    '@radix-ui/react-progress',
-                    '@radix-ui/react-collapsible'
-                  ]
-                }`
-              );
-            }
-            
-            fs.writeFileSync(viteConfigPath, viteConfig);
-            console.log('Updated vite.config.ts successfully');
-          }
-
-          console.log('Build preparation complete!');
-          EOF
-
-      - name: Install dependencies
-        run: |
-          echo "Installing dependencies with npm install..."
-          npm install --no-audit
-        env:
-          NODE_OPTIONS: "--max_old_space_size=4096"
-
-      - name: Install Radix UI dependencies explicitly
-        run: |
-          echo "Installing Radix UI dependencies explicitly..."
-          npm install @radix-ui/react-slot @radix-ui/react-popover @radix-ui/react-dialog @radix-ui/react-select @radix-ui/react-toast @radix-ui/react-scroll-area @radix-ui/react-aspect-ratio @radix-ui/react-alert-dialog @radix-ui/react-avatar @radix-ui/react-checkbox @radix-ui/react-dropdown-menu @radix-ui/react-label @radix-ui/react-separator @radix-ui/react-switch @radix-ui/react-tabs @radix-ui/react-radio-group @radix-ui/react-progress @radix-ui/react-collapsible @supabase/supabase-js
-
-      - name: Verify other critical dependencies
-        run: |
-          echo "Verifying other critical dependencies..."
-          # Create a list of required dependencies
-          DEPS=(
-            "react"
-            "react-dom"
-            "wouter"
-            "lucide-react"
-            "react-icons"
-            "@tanstack/react-query"
-            "firebase"
-            "gapi-script"
-            "papaparse"
-            "@hookform/resolvers"
-            "react-hook-form"
-            "zod"
-            "date-fns"
-            "express"
-            "recharts"
-            "class-variance-authority"
-            "clsx"
-            "tailwind-merge"
-          )
-          
-          # Check each dependency and install if missing
-          for DEP in "${DEPS[@]}"; do
-            if [ ! -d "node_modules/$DEP" ]; then
-              echo "Installing missing dependency: $DEP"
-              npm install "$DEP"
-            else
-              echo "✓ $DEP is installed"
-            fi
-          done
-        env:
-          NODE_OPTIONS: "--max_old_space_size=4096"
-
-      - name: Debug dependency structure
-        run: |
-          echo "Debugging dependency structure..."
-          ls -la node_modules/@radix-ui || echo "@radix-ui not found"
-          
-          # Check for specific Radix UI components
-          find node_modules -name "react-slot" | grep radix
-          
-          # Check package.json resolution
-          echo "Checking package resolution..."
-          node -e "console.log('Radix UI Slot:', require.resolve('@radix-ui/react-slot'))" || echo "Radix UI Slot not resolvable"
-
-      - name: Directly update Vite config for Radix UI
-        run: |
-          echo "Creating pre-build patch for Vite..."
-          # Create a patch file to fix Vite's handling of Radix UI
-          cat > vite-patch.mjs << EOF
-          // Patch to fix Vite's handling of Radix UI
-          import fs from 'fs';
-          
-          // Read the vite.config.ts file
-          const configPath = './vite.config.ts';
-          let config = fs.readFileSync(configPath, 'utf8');
-          
-          // Add Radix UI components to external if not already there
-          if (!config.includes('rollupOptions.external')) {
-            const externalConfig = \`
-            rollupOptions: {
-              external: [
-                '@radix-ui/react-slot',
-                '@radix-ui/react-popover',
-                '@radix-ui/react-dialog',
-                '@radix-ui/react-select',
-                '@radix-ui/react-toast',
-                '@radix-ui/react-scroll-area',
-                '@radix-ui/react-aspect-ratio',
-                '@radix-ui/react-alert-dialog',
-                '@radix-ui/react-avatar',
-                '@radix-ui/react-checkbox',
-                '@radix-ui/react-dropdown-menu',
-                '@radix-ui/react-label',
-                '@radix-ui/react-separator',
-                '@radix-ui/react-switch',
-                '@radix-ui/react-tabs',
-                '@radix-ui/react-radio-group',
-                '@radix-ui/react-progress',
-                '@radix-ui/react-collapsible'
-              ],
-            }\`;
-            
-            // Replace the empty rollupOptions with our new config
-            config = config.replace('rollupOptions: {\\n      external: [],\\n    }', externalConfig);
-            
-            // Write the updated config back to the file
-            fs.writeFileSync(configPath, config);
-            console.log('Updated vite.config.ts with Radix UI externals');
-          }
-          EOF
-          
-          # Run the patch
-          node vite-patch.mjs
+          echo "legacy-peer-deps=true" > .npmrc
+          echo "fund=false" >> .npmrc
+          echo "audit=false" >> .npmrc
 
       - name: Create direct build script
         run: |
@@ -313,25 +47,10 @@ jobs:
           console.log('Installing dependencies...');
           try {
             execSync('npm install --no-audit', { stdio: 'inherit' });
+            execSync('npm install vite@4.5.0 esbuild@0.18.0 @vitejs/plugin-react@4.0.0 --no-audit', { stdio: 'inherit' });
           } catch (error) {
             console.error('Failed to install dependencies:', error);
             process.exit(1);
-          }
-
-          // Install Vite explicitly
-          console.log('Installing Vite explicitly...');
-          try {
-            execSync('npm install vite@4.5.0 --no-audit', { stdio: 'inherit' });
-          } catch (error) {
-            console.error('Failed to install Vite:', error);
-          }
-
-          // Install Radix UI and Supabase explicitly
-          console.log('Installing Radix UI and Supabase explicitly...');
-          try {
-            execSync('npm install @radix-ui/react-slot @radix-ui/react-popover @radix-ui/react-dialog @radix-ui/react-select @radix-ui/react-toast @radix-ui/react-scroll-area @radix-ui/react-aspect-ratio @radix-ui/react-alert-dialog @radix-ui/react-avatar @radix-ui/react-checkbox @radix-ui/react-dropdown-menu @radix-ui/react-label @radix-ui/react-separator @radix-ui/react-switch @radix-ui/react-tabs @radix-ui/react-radio-group @radix-ui/react-progress @radix-ui/react-collapsible @supabase/supabase-js', { stdio: 'inherit' });
-          } catch (error) {
-            console.error('Failed to install Radix UI and Supabase:', error);
           }
 
           // Create a fixed vite.config.js file
@@ -359,91 +78,6 @@ jobs:
               outDir: path.resolve(__dirname, "dist/public"),
               emptyOutDir: true,
               sourcemap: false,
-              rollupOptions: {
-                external: [
-                  // Radix UI components
-                  '@radix-ui/react-slot',
-                  '@radix-ui/react-popover',
-                  '@radix-ui/react-dialog',
-                  '@radix-ui/react-select',
-                  '@radix-ui/react-toast',
-                  '@radix-ui/react-scroll-area',
-                  '@radix-ui/react-aspect-ratio',
-                  '@radix-ui/react-alert-dialog',
-                  '@radix-ui/react-avatar',
-                  '@radix-ui/react-checkbox',
-                  '@radix-ui/react-dropdown-menu',
-                  '@radix-ui/react-label',
-                  '@radix-ui/react-separator',
-                  '@radix-ui/react-switch',
-                  '@radix-ui/react-tabs',
-                  '@radix-ui/react-radio-group',
-                  '@radix-ui/react-progress',
-                  '@radix-ui/react-collapsible',
-                  
-                  // Supabase
-                  '@supabase/supabase-js'
-                ],
-              }
-            },
-            optimizeDeps: {
-              include: [
-                // Core React
-                "react",
-                "react-dom",
-                "react/jsx-runtime",
-                
-                // Routing
-                "wouter",
-                
-                // UI Components
-                "lucide-react",
-                "react-icons",
-                "react-icons/si",
-                "recharts",
-                
-                // Data Management
-                "@tanstack/react-query",
-                "@supabase/supabase-js",
-                
-                // Authentication
-                "firebase",
-                "firebase/auth",
-                "firebase/app",
-                "gapi-script",
-                
-                // Data Processing
-                "papaparse",
-                
-                // Form Handling
-                "@hookform/resolvers",
-                "@hookform/resolvers/zod",
-                "react-hook-form",
-                "zod",
-                
-                // Date Handling
-                "date-fns"
-              ],
-              exclude: [
-                '@radix-ui/react-slot',
-                '@radix-ui/react-popover',
-                '@radix-ui/react-dialog',
-                '@radix-ui/react-select',
-                '@radix-ui/react-toast',
-                '@radix-ui/react-scroll-area',
-                '@radix-ui/react-aspect-ratio',
-                '@radix-ui/react-alert-dialog',
-                '@radix-ui/react-avatar',
-                '@radix-ui/react-checkbox',
-                '@radix-ui/react-dropdown-menu',
-                '@radix-ui/react-label',
-                '@radix-ui/react-separator',
-                '@radix-ui/react-switch',
-                '@radix-ui/react-tabs',
-                '@radix-ui/react-radio-group',
-                '@radix-ui/react-progress',
-                '@radix-ui/react-collapsible'
-              ]
             },
             server: {
               port: 5173,
@@ -456,55 +90,118 @@ jobs:
           // Write the fixed config
           fs.writeFileSync('vite.config.js', viteConfig);
 
-          // Create a simplified supabase client
-          console.log('Creating simplified supabase client...');
-          const supabaseDir = path.resolve('client/src/lib');
-          
-          // Ensure directory exists
-          if (!fs.existsSync(supabaseDir)) {
-            fs.mkdirSync(supabaseDir, { recursive: true });
+          // Create client directory structure if it doesn't exist
+          const clientDir = path.resolve(__dirname, 'client');
+          const clientSrcDir = path.resolve(clientDir, 'src');
+          if (!fs.existsSync(clientSrcDir)) {
+            console.log('Creating client directory structure...');
+            fs.mkdirSync(clientSrcDir, { recursive: true });
+            
+            // Create a minimal index.html
+            const indexHtml = `
+          <!DOCTYPE html>
+          <html lang="en">
+            <head>
+              <meta charset="UTF-8" />
+              <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+              <title>Sales Inquiry App</title>
+            </head>
+            <body>
+              <div id="root"></div>
+              <script type="module" src="/src/main.tsx"></script>
+            </body>
+          </html>
+            `;
+            fs.writeFileSync(path.resolve(clientDir, 'index.html'), indexHtml);
+            
+            // Create a minimal main.tsx
+            const mainTsx = `
+          import React from 'react';
+          import ReactDOM from 'react-dom/client';
+          import App from './App';
+
+          ReactDOM.createRoot(document.getElementById('root')!).render(
+            <React.StrictMode>
+              <App />
+            </React.StrictMode>
+          );
+            `;
+            fs.writeFileSync(path.resolve(clientSrcDir, 'main.tsx'), mainTsx);
+            
+            // Create a minimal App.tsx
+            const appTsx = `
+          import React from 'react';
+
+          function App() {
+            return (
+              <div>
+                <h1>Sales Inquiry App</h1>
+              </div>
+            );
           }
-          
-          // Create a simplified supabase client
-          const supabaseClient = `
-          // Simplified Supabase client for build
-          const supabaseUrl = "https://mvmbtxwdovdubcojrwjz.supabase.co";
-          const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im12bWJ0eHdkb3ZkdWJjb2pyd2p6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY1MTQ1NDMsImV4cCI6MjA2MjA5MDU0M30.YXjE1qf7vDbgSzijgj-7HxxMFAXv0X6xn3PRL4WViMg";
 
-          console.log("Connecting to Supabase at:", supabaseUrl);
+          export default App;
+            `;
+            fs.writeFileSync(path.resolve(clientSrcDir, 'App.tsx'), appTsx);
+          }
 
-          // Mock Supabase client for build
-          export const supabase = {
-            auth: {
-              signInWithPassword: async () => ({ data: null, error: null }),
-              getUser: async () => ({ data: { user: null }, error: null }),
-              signOut: async () => ({ error: null })
-            },
-            from: (table) => ({
-              select: () => ({ data: [], error: null }),
-              insert: () => ({ data: null, error: null }),
-              update: () => ({ data: null, error: null }),
-              delete: () => ({ data: null, error: null })
-            })
-          };
-          `;
-          
-          fs.writeFileSync(path.join(supabaseDir, 'supabase.ts'), supabaseClient);
+          // Create server directory structure if it doesn't exist
+          const serverDir = path.resolve(__dirname, 'server');
+          if (!fs.existsSync(serverDir)) {
+            console.log('Creating server directory structure...');
+            fs.mkdirSync(serverDir, { recursive: true });
+            
+            // Create a minimal index.ts
+            const indexTs = `
+          import express from 'express';
+          import path from 'path';
+          import { fileURLToPath } from 'url';
 
-          // Run the build
-          console.log('Running build...');
+          const __dirname = path.dirname(fileURLToPath(import.meta.url));
+          const app = express();
+          const PORT = process.env.PORT || 5000;
+
+          // Serve static files
+          app.use(express.static(path.resolve(__dirname, 'public')));
+
+          // All other routes should redirect to index.html
+          app.get('*', (req, res) => {
+            res.sendFile(path.resolve(__dirname, 'public', 'index.html'));
+          });
+
+          app.listen(PORT, () => {
+            console.log(\`Server running on port \${PORT}\`);
+          });
+            `;
+            fs.writeFileSync(path.resolve(serverDir, 'index.ts'), indexTs);
+          }
+
+          // Create dist directory
+          const distDir = path.resolve(__dirname, 'dist');
+          if (!fs.existsSync(distDir)) {
+            fs.mkdirSync(distDir, { recursive: true });
+          }
+
+          // Build frontend
+          console.log('Building frontend...');
           try {
-            // Use npx to run vite directly from node_modules
-            execSync('npx vite build --force', { stdio: 'inherit' });
-            
-            // Build backend
-            execSync('npx esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist', { stdio: 'inherit' });
-            
-            console.log('Build completed successfully!');
+            // Remove the --force flag as it's not supported in Vite 4.5.0
+            execSync('npx vite build', { stdio: 'inherit' });
           } catch (error) {
-            console.error('Build failed:', error);
+            console.error('Failed to build frontend:', error);
             process.exit(1);
           }
+
+          // Build backend
+          console.log('Building backend...');
+          try {
+            execSync('npx esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist', { stdio: 'inherit' });
+          } catch (error) {
+            console.error('Failed to build backend:', error);
+            process.exit(1);
+          }
+
+          console.log('Build completed successfully!');
           EOF
 
       - name: Run direct build script
@@ -515,113 +212,14 @@ jobs:
           NODE_ENV: production
           NODE_OPTIONS: "--max_old_space_size=8192"
 
-      - name: Create deployment package
-        run: |
-          echo "Creating deployment package..."
-          
-          # Create deployment directory
-          mkdir -p deployment
-          
-          # Copy essential files
-          cp -r dist deployment/
-          
-          # Copy node_modules for Radix UI
-          mkdir -p deployment/node_modules/@radix-ui
-          cp -r node_modules/@radix-ui deployment/node_modules/
-          
-          # Create web.config for Azure
-          cat > deployment/web.config << EOF
-          <?xml version="1.0" encoding="utf-8"?>
-          <configuration>
-            <system.webServer>
-              <handlers>
-                <add name="iisnode" path="server.js" verb="*" modules="iisnode" />
-              </handlers>
-              <rewrite>
-                <rules>
-                  <rule name="StaticContent">
-                    <action type="Rewrite" url="public{REQUEST_URI}" />
-                    <conditions>
-                      <add input="{REQUEST_FILENAME}" matchType="IsFile" />
-                    </conditions>
-                  </rule>
-                  <rule name="DynamicContent">
-                    <conditions>
-                      <add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true" />
-                    </conditions>
-                    <action type="Rewrite" url="server.js" />
-                  </rule>
-                </rules>
-              </rewrite>
-              <iisnode 
-                nodeProcessCommandLine="node"
-                watchedFiles="web.config;*.js"
-                loggingEnabled="true"
-                logDirectory="iisnode" />
-            </system.webServer>
-          </configuration>
-          EOF
-          
-          # Create server.js for serving static files
-          cat > deployment/server.js << EOF
-          import express from 'express';
-          import path from 'path';
-          import { fileURLToPath } from 'url';
-
-          const __dirname = path.dirname(fileURLToPath(import.meta.url));
-          const app = express();
-          const PORT = process.env.PORT || 8080;
-
-          // Serve static files
-          app.use(express.static(path.join(__dirname, 'public')));
-
-          // Serve index.html for all routes (SPA fallback)
-          app.get('*', (req, res) => {
-            res.sendFile(path.join(__dirname, 'public', 'index.html'));
-          });
-
-          app.listen(PORT, () => {
-            console.log(\`Server running on port \${PORT}\`);
-          });
-          EOF
-          
-          # Create a production package.json
-          cat > deployment/package.json << EOF
-          {
-            "name": "sales-inquiry-azure",
-            "version": "1.0.0",
-            "type": "module",
-            "engines": {
-              "node": ">=20.0.0"
-            },
-            "scripts": {
-              "start": "node server.js"
-            },
-            "dependencies": {
-              "express": "^4.18.2",
-              "@radix-ui/react-slot": "^1.0.0",
-              "@radix-ui/react-popover": "^1.0.0",
-              "@radix-ui/react-dialog": "^1.0.0",
-              "@radix-ui/react-select": "^1.0.0",
-              "@radix-ui/react-toast": "^1.0.0",
-              "@radix-ui/react-scroll-area": "^1.0.0"
-            }
-          }
-          EOF
-          
-          # Install only express in the deployment folder
-          cd deployment
-          npm install --omit=dev --no-package-lock
-          
-          # Zip everything for deployment
-          zip -r ../release.zip ./*
+      - name: Zip artifact for deployment
+        run: zip release.zip ./* -r
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
           name: node-app
           path: release.zip
-          retention-days: 1
 
   deploy:
     runs-on: ubuntu-latest
@@ -630,8 +228,7 @@ jobs:
       name: 'Production'
       url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
     permissions:
-      id-token: write
-      contents: read
+      id-token: write #This is required for requesting the JWT
 
     steps:
       - name: Download artifact from build job
@@ -641,46 +238,18 @@ jobs:
 
       - name: Unzip artifact for deployment
         run: unzip release.zip
-      
+
       - name: Login to Azure
-        uses: azure/login@v2
+        uses: azure/login@v1
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_886E565E15F54F64825AFC8382A0E7EA }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_D814736B79FA4FBC95BEDB87DF16ECCF }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_51420C1A3F184E88ADC3E862DB86A4EF }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_GUID }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_GUID }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_GUID }}
 
       - name: 'Deploy to Azure Web App'
         id: deploy-to-webapp
-        uses: azure/webapps-deploy@v3
+        uses: azure/webapps-deploy@v2
         with:
           app-name: 'SalesInquiryGroup'
           slot-name: 'Production'
-          package: .
-          
-      - name: Set App Settings
-        uses: azure/appservice-settings@v1
-        with:
-          app-name: 'SalesInquiryGroup'
-          app-settings-json: |
-            [
-              {
-                "name": "NODE_ENV",
-                "value": "production"
-              },
-              {
-                "name": "PORT",
-                "value": "8080"
-              },
-              {
-                "name": "WEBSITE_NODE_DEFAULT_VERSION",
-                "value": "~20"
-              },
-              {
-                "name": "SCM_DO_BUILD_DURING_DEPLOYMENT",
-                "value": "false"
-              },
-              {
-                "name": "WEBSITE_RUN_FROM_PACKAGE",
-                "value": "0"
-              }
             ]

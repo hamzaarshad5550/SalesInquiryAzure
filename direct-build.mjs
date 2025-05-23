@@ -18,6 +18,43 @@ try {
   process.exit(1);
 }
 
+// Create a fixed vite.config.js file
+console.log('Creating fixed Vite config...');
+const viteConfig = `
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    alias: {
+      "@db": path.resolve(__dirname, "db"),
+      "@": path.resolve(__dirname, "client", "src"),
+      "@shared": path.resolve(__dirname, "shared"),
+      "@assets": path.resolve(__dirname, "attached_assets"),
+    },
+  },
+  root: path.resolve(__dirname, "client"),
+  build: {
+    outDir: path.resolve(__dirname, "dist/public"),
+    emptyOutDir: true,
+    sourcemap: false,
+  },
+  server: {
+    port: 5173,
+    strictPort: true,
+    host: true,
+  }
+});
+`;
+
+// Write the fixed config
+fs.writeFileSync('vite.config.js', viteConfig);
+
 // Create client directory structure if it doesn't exist
 const clientDir = path.resolve(__dirname, 'client');
 const clientSrcDir = path.resolve(clientDir, 'src');
@@ -113,6 +150,7 @@ if (!fs.existsSync(distDir)) {
 // Build frontend
 console.log('Building frontend...');
 try {
+  // Remove the --force flag as it's not supported in Vite 4.5.0
   execSync('npx vite build', { stdio: 'inherit' });
 } catch (error) {
   console.error('Failed to build frontend:', error);
