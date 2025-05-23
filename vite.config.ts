@@ -40,6 +40,26 @@ export default defineConfig({
       "react-icons/si",
       "recharts",
       
+      // Radix UI Components
+      "@radix-ui/react-slot",
+      "@radix-ui/react-popover",
+      "@radix-ui/react-dialog",
+      "@radix-ui/react-select",
+      "@radix-ui/react-toast",
+      "@radix-ui/react-scroll-area",
+      "@radix-ui/react-aspect-ratio",
+      "@radix-ui/react-alert-dialog",
+      "@radix-ui/react-avatar",
+      "@radix-ui/react-checkbox",
+      "@radix-ui/react-dropdown-menu",
+      "@radix-ui/react-label",
+      "@radix-ui/react-separator",
+      "@radix-ui/react-switch",
+      "@radix-ui/react-tabs",
+      "@radix-ui/react-radio-group",
+      "@radix-ui/react-progress",
+      "@radix-ui/react-collapsible",
+      
       // Data Management
       "@tanstack/react-query",
       

@@ -31,9 +31,46 @@ jobs:
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
-      - name: Verify critical dependencies
+      - name: Verify Radix UI dependencies
         run: |
-          echo "Verifying critical dependencies..."
+          echo "Verifying Radix UI dependencies..."
+          # Create a list of required Radix UI dependencies
+          RADIX_DEPS=(
+            "@radix-ui/react-slot"
+            "@radix-ui/react-popover"
+            "@radix-ui/react-dialog"
+            "@radix-ui/react-select"
+            "@radix-ui/react-toast"
+            "@radix-ui/react-scroll-area"
+            "@radix-ui/react-aspect-ratio"
+            "@radix-ui/react-alert-dialog"
+            "@radix-ui/react-avatar"
+            "@radix-ui/react-checkbox"
+            "@radix-ui/react-dropdown-menu"
+            "@radix-ui/react-label"
+            "@radix-ui/react-separator"
+            "@radix-ui/react-switch"
+            "@radix-ui/react-tabs"
+            "@radix-ui/react-radio-group"
+            "@radix-ui/react-progress"
+            "@radix-ui/react-collapsible"
+          )
+          
+          # Check each dependency and install if missing
+          for DEP in "${RADIX_DEPS[@]}"; do
+            if [ ! -d "node_modules/$DEP" ]; then
+              echo "Installing missing dependency: $DEP"
+              npm install "$DEP"
+            else
+              echo "✓ $DEP is installed"
+            fi
+          done
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
+
+      - name: Verify other critical dependencies
+        run: |
+          echo "Verifying other critical dependencies..."
           # Create a list of required dependencies
           DEPS=(
             "react"
@@ -51,6 +88,9 @@ jobs:
             "date-fns"
             "express"
             "recharts"
+            "class-variance-authority"
+            "clsx"
+            "tailwind-merge"
           )
           
           # Check each dependency and install if missing
@@ -68,29 +108,190 @@ jobs:
       - name: Debug dependency structure
         run: |
           echo "Debugging dependency structure..."
-          ls -la node_modules/@hookform
-          ls -la node_modules/firebase
-          ls -la node_modules/papaparse
-          ls -la node_modules/recharts || echo "recharts not found"
+          ls -la node_modules/@radix-ui || echo "@radix-ui not found"
           
-          # Check for nested dependencies
-          find node_modules -name "resolvers" | grep hookform
-          find node_modules -name "auth" | grep firebase
+          # Check for specific Radix UI components
+          find node_modules -name "react-slot" | grep radix
           
           # Check package.json resolution
           echo "Checking package resolution..."
-          node -e "console.log('Firebase:', require.resolve('firebase/auth'))"
-          node -e "console.log('Hookform:', require.resolve('@hookform/resolvers/zod'))"
-          node -e "console.log('Papaparse:', require.resolve('papaparse'))"
-          node -e "console.log('Recharts:', require.resolve('recharts'))" || echo "Recharts not resolvable"
+          node -e "console.log('Radix UI Slot:', require.resolve('@radix-ui/react-slot'))" || echo "Radix UI Slot not resolvable"
 
-      - name: Build application with verbose logging
+      - name: Create pre-build patch for Vite
         run: |
-          echo "Building application with verbose logging..."
-          # Set environment variable for more verbose Vite output
-          export VITE_DEBUG=true
-          # Run build with --debug flag
-          npm run build -- --debug
+          echo "Creating pre-build patch for Vite..."
+          # Create a patch file to fix Vite's handling of Radix UI
+          cat > vite-patch.js << EOF
+          // Patch to fix Vite's handling of Radix UI
+          import fs from 'fs';
+          
+          // Read the vite.config.ts file
+          const configPath = './vite.config.ts';
+          let config = fs.readFileSync(configPath, 'utf8');
+          
+          // Add Radix UI components to external if not already there
+          if (!config.includes('rollupOptions.external')) {
+            const externalConfig = \`
+            rollupOptions: {
+              external: [
+                '@radix-ui/react-slot',
+                '@radix-ui/react-popover',
+                '@radix-ui/react-dialog',
+                '@radix-ui/react-select',
+                '@radix-ui/react-toast',
+                '@radix-ui/react-scroll-area',
+                '@radix-ui/react-aspect-ratio',
+                '@radix-ui/react-alert-dialog',
+                '@radix-ui/react-avatar',
+                '@radix-ui/react-checkbox',
+                '@radix-ui/react-dropdown-menu',
+                '@radix-ui/react-label',
+                '@radix-ui/react-separator',
+                '@radix-ui/react-switch',
+                '@radix-ui/react-tabs',
+                '@radix-ui/react-radio-group',
+                '@radix-ui/react-progress',
+                '@radix-ui/react-collapsible'
+              ],
+            }\`;
+            
+            // Replace the empty rollupOptions with our new config
+            config = config.replace('rollupOptions: {\\n      external: [],\\n    }', externalConfig);
+            
+            // Write the updated config back to the file
+            fs.writeFileSync(configPath, config);
+            console.log('Updated vite.config.ts with Radix UI externals');
+          }
+          EOF
+          
+          # Run the patch
+          node vite-patch.js
+
+      - name: Build application with special handling for Radix UI
+        run: |
+          echo "Building application with special handling for Radix UI..."
+          # Create a temporary build script
+          cat > build-with-radix.js << EOF
+          // Custom build script to handle Radix UI
+          const { execSync } = require('child_process');
+          
+          try {
+            // First, try to build normally
+            console.log('Attempting normal build...');
+            execSync('npm run build', { stdio: 'inherit' });
+          } catch (error) {
+            console.log('Normal build failed, trying alternative approach...');
+            
+            // If that fails, try with explicit externals
+            console.log('Creating explicit externals for Radix UI...');
+            const viteConfig = \`
+          import { defineConfig } from "vite";
+          import react from "@vitejs/plugin-react";
+          import path from "path";
+          import { fileURLToPath } from "url";
+
+          const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+          export default defineConfig({
+            plugins: [react()],
+            resolve: {
+              alias: {
+                "@db": path.resolve(__dirname, "db"),
+                "@": path.resolve(__dirname, "client", "src"),
+                "@shared": path.resolve(__dirname, "shared"),
+                "@assets": path.resolve(__dirname, "attached_assets"),
+              },
+            },
+            root: path.resolve(__dirname, "client"),
+            build: {
+              outDir: path.resolve(__dirname, "dist/public"),
+              emptyOutDir: true,
+              sourcemap: false,
+              rollupOptions: {
+                external: [
+                  '@radix-ui/react-slot',
+                  '@radix-ui/react-popover',
+                  '@radix-ui/react-dialog',
+                  '@radix-ui/react-select',
+                  '@radix-ui/react-toast',
+                  '@radix-ui/react-scroll-area',
+                  '@radix-ui/react-aspect-ratio',
+                  '@radix-ui/react-alert-dialog',
+                  '@radix-ui/react-avatar',
+                  '@radix-ui/react-checkbox',
+                  '@radix-ui/react-dropdown-menu',
+                  '@radix-ui/react-label',
+                  '@radix-ui/react-separator',
+                  '@radix-ui/react-switch',
+                  '@radix-ui/react-tabs',
+                  '@radix-ui/react-radio-group',
+                  '@radix-ui/react-progress',
+                  '@radix-ui/react-collapsible'
+                ],
+              }
+            },
+            optimizeDeps: {
+              include: [
+                "react",
+                "react-dom",
+                "react/jsx-runtime",
+                "wouter",
+                "lucide-react",
+                "react-icons",
+                "react-icons/si",
+                "recharts",
+                "@tanstack/react-query",
+                "firebase",
+                "firebase/auth",
+                "firebase/app",
+                "gapi-script",
+                "papaparse",
+                "@hookform/resolvers",
+                "@hookform/resolvers/zod",
+                "react-hook-form",
+                "zod",
+                "date-fns"
+              ],
+              exclude: [
+                '@radix-ui/react-slot',
+                '@radix-ui/react-popover',
+                '@radix-ui/react-dialog',
+                '@radix-ui/react-select',
+                '@radix-ui/react-toast',
+                '@radix-ui/react-scroll-area',
+                '@radix-ui/react-aspect-ratio',
+                '@radix-ui/react-alert-dialog',
+                '@radix-ui/react-avatar',
+                '@radix-ui/react-checkbox',
+                '@radix-ui/react-dropdown-menu',
+                '@radix-ui/react-label',
+                '@radix-ui/react-separator',
+                '@radix-ui/react-switch',
+                '@radix-ui/react-tabs',
+                '@radix-ui/react-radio-group',
+                '@radix-ui/react-progress',
+                '@radix-ui/react-collapsible'
+              ]
+            },
+            server: {
+              port: 5173,
+              strictPort: true,
+              host: true,
+            }
+          });
+            \`;
+            
+            // Write the temporary config
+            require('fs').writeFileSync('vite.config.js', viteConfig);
+            
+            // Try building with the new config
+            console.log('Building with explicit externals...');
+            execSync('npm run build', { stdio: 'inherit' });
+          }
+          EOF
+          
+          # Run the custom build script
+          node build-with-radix.js
         env:
           NODE_ENV: production
           NODE_OPTIONS: "--max_old_space_size=8192"
@@ -104,6 +305,10 @@ jobs:
           
           # Copy essential files
           cp -r dist deployment/
+          
+          # Copy node_modules for Radix UI
+          mkdir -p deployment/node_modules/@radix-ui
+          cp -r node_modules/@radix-ui deployment/node_modules/
           
           # Create web.config for Azure
           cat > deployment/web.config << EOF
@@ -174,7 +379,13 @@ jobs:
               "start": "node server.js"
             },
             "dependencies": {
-              "express": "^4.18.2"
+              "express": "^4.18.2",
+              "@radix-ui/react-slot": "^1.0.0",
+              "@radix-ui/react-popover": "^1.0.0",
+              "@radix-ui/react-dialog": "^1.0.0",
+              "@radix-ui/react-select": "^1.0.0",
+              "@radix-ui/react-toast": "^1.0.0",
+              "@radix-ui/react-scroll-area": "^1.0.0"
             }
           }
           EOF
