@@ -24,7 +24,12 @@ jobs:
           node-version: '20.x'
 
       - name: Install dependencies
-        run: npm install
+        run: |
+          npm install
+          # Explicitly install Tailwind CSS and related packages
+          npm install -D tailwindcss postcss autoprefixer tailwindcss-animate @tailwindcss/typography
+          # Verify Tailwind is installed
+          npx tailwindcss --help
 
       - name: Create simplified build script
         run: |
@@ -49,10 +54,33 @@ jobs:
             fs.mkdirSync(publicDir, { recursive: true });
           }
 
+          // Verify Tailwind CSS is installed
+          try {
+            console.log('Checking Tailwind CSS installation...');
+            execSync('npx tailwindcss --help', { stdio: 'inherit' });
+          } catch (error) {
+            console.error('Tailwind CSS is not properly installed, installing now...');
+            execSync('npm install -D tailwindcss postcss autoprefixer tailwindcss-animate @tailwindcss/typography', { stdio: 'inherit' });
+          }
+
           // Build client application
           try {
             // First build the client application with Vite
             console.log('Building client application...');
+            
+            // Create a simplified CSS file if needed
+            const cssDir = path.resolve(__dirname, 'client', 'src');
+            const cssFile = path.resolve(cssDir, 'index.css');
+            
+            if (!fs.existsSync(cssFile)) {
+              console.log('Creating simplified index.css file...');
+              fs.writeFileSync(
+                cssFile,
+                '@tailwind base;\n@tailwind components;\n@tailwind utilities;'
+              );
+            }
+            
+            // Run the build
             execSync('npx vite build --outDir dist/public', { stdio: 'inherit' });
             
             // If the build fails or doesn't produce an index.html, fall back to copying files
