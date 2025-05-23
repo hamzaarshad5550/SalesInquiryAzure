@@ -8,12 +8,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Get deals with created_at and value
     const { data: deals, error } = await supabase
       .from('deals')
-      .select('created_at, value, status');
+      .select('*');
     
     if (error) throw error;
     
-    // Filter closed deals
-    const closedDeals = deals.filter(deal => deal.status === 'closed_won');
+    // Determine which field indicates a closed deal
+    const closedDeals = deals.filter(deal => 
+      deal.status === 'closed_won' || 
+      deal.stage === 5 || 
+      deal.stageId === 5
+    );
     
     // Group by month/week/etc based on period
     const currentPeriodDeals: Record<string, number> = {};
@@ -23,29 +27,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let dateFormat: Intl.DateTimeFormatOptions;
     let periodOffset: number;
     
-    // Set date format and period offset based on selected period
-    switch(period) {
-      case 'weekly':
-        dateFormat = { weekday: 'short' };
-        periodOffset = 7; // 7 days
-        break;
-      case 'quarterly':
-        dateFormat = { month: 'short' };
-        periodOffset = 3; // 3 months
-        break;
-      case 'yearly':
-        dateFormat = { month: 'short' };
-        periodOffset = 12; // 12 months
-        break;
-      case 'monthly':
-      default:
-        dateFormat = { day: '2-digit' };
-        periodOffset = 30; // ~1 month in days
+    // Set date format and period offset based on period
+    if (period === 'weekly') {
+      dateFormat = { month: 'short', day: 'numeric' };
+      periodOffset = 7;
+    } else if (period === 'quarterly') {
+      dateFormat = { month: 'short', year: 'numeric' };
+      periodOffset = 90;
+    } else if (period === 'yearly') {
+      dateFormat = { year: 'numeric' };
+      periodOffset = 365;
+    } else {
+      // Default to monthly
+      dateFormat = { month: 'short' };
+      periodOffset = 30;
     }
     
     // Process deals
     closedDeals.forEach(deal => {
-      const dealDate = new Date(deal.created_at);
+      const dealDate = new Date(deal.created_at || deal.createdAt);
       const formattedDate = new Intl.DateTimeFormat('en-US', dateFormat).format(dealDate);
       const daysDiff = Math.floor((now.getTime() - dealDate.getTime()) / (1000 * 60 * 60 * 24));
       
@@ -75,6 +75,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.status(200).json({ salesData });
   } catch (error) {
     console.error('Error fetching sales performance:', error);
-    res.status(500).json({ error: 'Failed to fetch sales performance' });
+    res.status(500).json({ error: 'Failed to fetch sales performance', salesData: [] });
   }
 }

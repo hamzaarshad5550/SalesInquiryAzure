@@ -1,3 +1,4 @@
+// Direct build script that doesn't rely on npm scripts
 import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
@@ -7,29 +8,116 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 console.log('Starting direct build process...');
 
-// Create dist directory
-const distDir = path.resolve(__dirname, 'dist');
-if (!fs.existsSync(distDir)) {
-  fs.mkdirSync(distDir, { recursive: true });
+// Install dependencies
+console.log('Installing dependencies...');
+try {
+  execSync('npm install --no-audit', { stdio: 'inherit' });
+  execSync('npm install vite@4.5.0 esbuild@0.18.0 @vitejs/plugin-react@4.0.0 --no-audit', { stdio: 'inherit' });
+} catch (error) {
+  console.error('Failed to install dependencies:', error);
+  process.exit(1);
 }
 
-const publicDir = path.resolve(distDir, 'public');
-if (!fs.existsSync(publicDir)) {
-  fs.mkdirSync(publicDir, { recursive: true });
-}
+// Create a fixed vite.config.js file
+console.log('Creating fixed Vite config...');
+const viteConfig = `
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import path from "path";
+import { fileURLToPath } from "url";
 
-// Create a fallback index.html and static files
-console.log('Creating fallback static files...');
-fs.writeFileSync(
-  path.resolve(publicDir, 'index.html'),
-  '<!DOCTYPE html>\n<html lang="en">\n  <head>\n    <meta charset="UTF-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />\n    <title>Sales Inquiry Group</title>\n    <style>body{font-family:system-ui,-apple-system,sans-serif;background:#f5f5f5;display:flex;justify-content:center;align-items:center;height:100vh;margin:0}.container{text-align:center;padding:2rem;background:white;border-radius:8px;box-shadow:0 4px 6px rgba(0,0,0,0.1);max-width:500px}</style>\n  </head>\n  <body>\n    <div class="container">\n      <h1>Sales Inquiry Group</h1>\n      <p>Application is loading...</p>\n    </div>\n    <script>console.log("Application initialized");</script>\n  </body>\n</html>'
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    alias: {
+      "@db": path.resolve(__dirname, "db"),
+      "@": path.resolve(__dirname, "client", "src"),
+      "@shared": path.resolve(__dirname, "shared"),
+      "@assets": path.resolve(__dirname, "attached_assets"),
+    },
+  },
+  root: path.resolve(__dirname, "client"),
+  build: {
+    outDir: path.resolve(__dirname, "dist/public"),
+    emptyOutDir: true,
+    sourcemap: false,
+  },
+  server: {
+    port: 5173,
+    strictPort: true,
+    host: true,
+  }
+});
+`;
+
+// Write the fixed config
+fs.writeFileSync('vite.config.js', viteConfig);
+
+// Create client directory structure if it doesn't exist
+const clientDir = path.resolve(__dirname, 'client');
+const clientSrcDir = path.resolve(clientDir, 'src');
+if (!fs.existsSync(clientSrcDir)) {
+  console.log('Creating client directory structure...');
+  fs.mkdirSync(clientSrcDir, { recursive: true });
+  
+  // Create a minimal index.html
+  const indexHtml = `
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sales Inquiry App</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+  `;
+  fs.writeFileSync(path.resolve(clientDir, 'index.html'), indexHtml);
+  
+  // Create a minimal main.tsx
+  const mainTsx = `
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
 );
+  `;
+  fs.writeFileSync(path.resolve(clientSrcDir, 'main.tsx'), mainTsx);
+  
+  // Create a minimal App.tsx
+  const appTsx = `
+import React from 'react';
 
-// Create a simplified server file directly in the dist directory
-console.log('Creating simplified server file...');
+function App() {
+  return (
+    <div>
+      <h1>Sales Inquiry App</h1>
+    </div>
+  );
+}
 
-// Create a simple server file directly in JavaScript (no TypeScript)
-const serverJs = `
+export default App;
+  `;
+  fs.writeFileSync(path.resolve(clientSrcDir, 'App.tsx'), appTsx);
+}
+
+// Create server directory structure if it doesn't exist
+const serverDir = path.resolve(__dirname, 'server');
+if (!fs.existsSync(serverDir)) {
+  console.log('Creating server directory structure...');
+  fs.mkdirSync(serverDir, { recursive: true });
+  
+  // Create a minimal index.ts
+  const indexTs = `
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -39,38 +127,92 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Serve static files
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.resolve(__dirname, 'public')));
 
-// API endpoint
-app.get('/api/status', (req, res) => {
-  res.json({ status: 'ok', message: 'Server is running' });
-});
-
-// Catch-all route to serve the SPA
+// All other routes should redirect to index.html
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.resolve(__dirname, 'public', 'index.html'));
 });
 
 app.listen(PORT, () => {
   console.log(\`Server running on port \${PORT}\`);
 });
-`;
+  `;
+  fs.writeFileSync(path.resolve(serverDir, 'index.ts'), indexTs);
+}
 
-fs.writeFileSync(path.resolve(distDir, 'index.js'), serverJs);
+// Create dist directory
+const distDir = path.resolve(__dirname, 'dist');
+if (!fs.existsSync(distDir)) {
+  fs.mkdirSync(distDir, { recursive: true });
+}
 
-// Create a simple package.json for the server
-const packageJson = {
-  "type": "module",
-  "dependencies": {
-    "express": "^4.18.2"
+// Build frontend
+console.log('Building frontend...');
+try {
+  // Create a standalone build script that doesn't rely on vite.config.js
+  const buildScript = `
+  import { build } from 'vite';
+  import react from '@vitejs/plugin-react';
+  import path from 'path';
+  import { fileURLToPath } from 'url';
+  
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  
+  async function buildApp() {
+    try {
+      await build({
+        configFile: false,
+        root: path.resolve(__dirname, 'client'),
+        plugins: [react()],
+        resolve: {
+          alias: {
+            "@db": path.resolve(__dirname, "db"),
+            "@": path.resolve(__dirname, "client", "src"),
+            "@shared": path.resolve(__dirname, "shared"),
+            "@assets": path.resolve(__dirname, "attached_assets"),
+          },
+        },
+        build: {
+          outDir: path.resolve(__dirname, "dist/public"),
+          emptyOutDir: true,
+          sourcemap: false,
+        }
+      });
+      console.log('Build completed successfully');
+    } catch (error) {
+      console.error('Build failed:', error);
+      process.exit(1);
+    }
   }
-};
-fs.writeFileSync(path.resolve(distDir, 'package.json'), JSON.stringify(packageJson, null, 2));
+  
+  buildApp();
+  `;
+  
+  // Write the build script
+  fs.writeFileSync('vite-build.mjs', buildScript);
+  
+  // Install dependencies explicitly
+  execSync('npm install vite@4.5.0 @vitejs/plugin-react@4.0.0 --no-audit', { stdio: 'inherit' });
+  
+  // Run the standalone build script
+  execSync('node vite-build.mjs', { stdio: 'inherit' });
+} catch (error) {
+  console.error('Failed to build frontend:', error);
+  process.exit(1);
+}
 
-// Create a simple entry point for Azure
-fs.writeFileSync(
-  path.resolve(__dirname, 'server.js'),
-  'import "./dist/index.js";'
-);
+// Build backend
+console.log('Building backend...');
+try {
+  execSync('npx esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist', { stdio: 'inherit' });
+} catch (error) {
+  console.error('Failed to build backend:', error);
+  process.exit(1);
+}
 
 console.log('Build completed successfully!');
+
+
+
+
