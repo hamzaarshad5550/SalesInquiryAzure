@@ -117,11 +117,11 @@ jobs:
           echo "Checking package resolution..."
           node -e "console.log('Radix UI Slot:', require.resolve('@radix-ui/react-slot'))" || echo "Radix UI Slot not resolvable"
 
-      - name: Create pre-build patch for Vite
+      - name: Directly update Vite config for Radix UI
         run: |
           echo "Creating pre-build patch for Vite..."
           # Create a patch file to fix Vite's handling of Radix UI
-          cat > vite-patch.js << EOF
+          cat > vite-patch.mjs << EOF
           // Patch to fix Vite's handling of Radix UI
           import fs from 'fs';
           
@@ -165,15 +165,16 @@ jobs:
           EOF
           
           # Run the patch
-          node vite-patch.js
+          node vite-patch.mjs
 
       - name: Build application with special handling for Radix UI
         run: |
           echo "Building application with special handling for Radix UI..."
           # Create a temporary build script
-          cat > build-with-radix.js << EOF
+          cat > build-with-radix.mjs << EOF
           // Custom build script to handle Radix UI
-          const { execSync } = require('child_process');
+          import { execSync } from 'child_process';
+          import fs from 'fs';
           
           try {
             // First, try to build normally
@@ -282,7 +283,7 @@ jobs:
             \`;
             
             // Write the temporary config
-            require('fs').writeFileSync('vite.config.js', viteConfig);
+            fs.writeFileSync('vite.config.js', viteConfig);
             
             // Try building with the new config
             console.log('Building with explicit externals...');
@@ -291,7 +292,7 @@ jobs:
           EOF
           
           # Run the custom build script
-          node build-with-radix.js
+          node build-with-radix.mjs
         env:
           NODE_ENV: production
           NODE_OPTIONS: "--max_old_space_size=8192"
