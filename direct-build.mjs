@@ -150,8 +150,47 @@ if (!fs.existsSync(distDir)) {
 // Build frontend
 console.log('Building frontend...');
 try {
-  // Remove the --force flag as it's not supported in Vite 4.5.0
-  execSync('npx vite build', { stdio: 'inherit' });
+  // Install dependencies explicitly
+  execSync('npm install vite@4.5.0 @vitejs/plugin-react@4.0.0 --no-audit', { stdio: 'inherit' });
+  
+  // Create a simplified vite.config.js that's compatible with Vite 4.5.0
+  const simpleViteConfig = `
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import path from 'path';
+
+// Use CommonJS style path resolution for Vite 4.5.0
+const __dirname = path.dirname(new URL(import.meta.url).pathname);
+
+export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    alias: {
+      "@db": path.resolve(__dirname, "db"),
+      "@": path.resolve(__dirname, "client", "src"),
+      "@shared": path.resolve(__dirname, "shared"),
+      "@assets": path.resolve(__dirname, "attached_assets"),
+    },
+  },
+  root: path.resolve(__dirname, "client"),
+  build: {
+    outDir: path.resolve(__dirname, "dist/public"),
+    emptyOutDir: true,
+    sourcemap: false,
+  },
+  server: {
+    port: 5173,
+    strictPort: true,
+    host: true,
+  }
+});
+  `;
+  
+  // Write the simplified config
+  fs.writeFileSync('vite.config.js', simpleViteConfig);
+  
+  // Run the build with the simplified config
+  execSync('npx vite@4.5.0 build', { stdio: 'inherit' });
 } catch (error) {
   console.error('Failed to build frontend:', error);
   process.exit(1);
@@ -167,3 +206,6 @@ try {
 }
 
 console.log('Build completed successfully!');
+
+
+
