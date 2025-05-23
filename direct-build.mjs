@@ -150,47 +150,53 @@ if (!fs.existsSync(distDir)) {
 // Build frontend
 console.log('Building frontend...');
 try {
+  // Create a standalone build script that doesn't rely on vite.config.js
+  const buildScript = `
+  import { build } from 'vite';
+  import react from '@vitejs/plugin-react';
+  import path from 'path';
+  import { fileURLToPath } from 'url';
+  
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  
+  async function buildApp() {
+    try {
+      await build({
+        configFile: false,
+        root: path.resolve(__dirname, 'client'),
+        plugins: [react()],
+        resolve: {
+          alias: {
+            "@db": path.resolve(__dirname, "db"),
+            "@": path.resolve(__dirname, "client", "src"),
+            "@shared": path.resolve(__dirname, "shared"),
+            "@assets": path.resolve(__dirname, "attached_assets"),
+          },
+        },
+        build: {
+          outDir: path.resolve(__dirname, "dist/public"),
+          emptyOutDir: true,
+          sourcemap: false,
+        }
+      });
+      console.log('Build completed successfully');
+    } catch (error) {
+      console.error('Build failed:', error);
+      process.exit(1);
+    }
+  }
+  
+  buildApp();
+  `;
+  
+  // Write the build script
+  fs.writeFileSync('vite-build.mjs', buildScript);
+  
   // Install dependencies explicitly
   execSync('npm install vite@4.5.0 @vitejs/plugin-react@4.0.0 --no-audit', { stdio: 'inherit' });
   
-  // Create a simplified vite.config.js that's compatible with Vite 4.5.0
-  const simpleViteConfig = `
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import path from 'path';
-
-// Use CommonJS style path resolution for Vite 4.5.0
-const __dirname = path.dirname(new URL(import.meta.url).pathname);
-
-export default defineConfig({
-  plugins: [react()],
-  resolve: {
-    alias: {
-      "@db": path.resolve(__dirname, "db"),
-      "@": path.resolve(__dirname, "client", "src"),
-      "@shared": path.resolve(__dirname, "shared"),
-      "@assets": path.resolve(__dirname, "attached_assets"),
-    },
-  },
-  root: path.resolve(__dirname, "client"),
-  build: {
-    outDir: path.resolve(__dirname, "dist/public"),
-    emptyOutDir: true,
-    sourcemap: false,
-  },
-  server: {
-    port: 5173,
-    strictPort: true,
-    host: true,
-  }
-});
-  `;
-  
-  // Write the simplified config
-  fs.writeFileSync('vite.config.js', simpleViteConfig);
-  
-  // Run the build with the simplified config
-  execSync('npx vite@4.5.0 build', { stdio: 'inherit' });
+  // Run the standalone build script
+  execSync('node vite-build.mjs', { stdio: 'inherit' });
 } catch (error) {
   console.error('Failed to build frontend:', error);
   process.exit(1);
@@ -206,6 +212,7 @@ try {
 }
 
 console.log('Build completed successfully!');
+
 
 
 
