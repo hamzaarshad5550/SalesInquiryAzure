@@ -26,21 +26,42 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: [
+      // Core React
       "react",
       "react-dom",
+      "react/jsx-runtime",
+      
+      // Routing
       "wouter",
+      
+      // UI Components
       "lucide-react",
       "react-icons",
       "react-icons/si",
+      "recharts",
+      
+      // Data Management
       "@tanstack/react-query",
+      
+      // Authentication
       "firebase",
       "firebase/auth",
+      "firebase/app",
       "gapi-script",
+      
+      // Data Processing
       "papaparse",
+      
+      // Form Handling
+      "@hookform/resolvers",
       "@hookform/resolvers/zod",
       "react-hook-form",
-      "zod"
-    ]
+      "zod",
+      
+      // Date Handling
+      "date-fns"
+    ],
+    exclude: []
   },
   server: {
     port: 5173,

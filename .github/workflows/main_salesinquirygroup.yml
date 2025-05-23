@@ -24,9 +24,9 @@ jobs:
           node-version: '20.x'
           cache: 'npm'
 
-      - name: Install dependencies
+      - name: Install root dependencies
         run: |
-          echo "Installing dependencies..."
+          echo "Installing root dependencies..."
           npm ci --no-audit
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
@@ -50,6 +50,7 @@ jobs:
             "zod"
             "date-fns"
             "express"
+            "recharts"
           )
           
           # Check each dependency and install if missing
@@ -64,13 +65,35 @@ jobs:
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
-      - name: Build application
+      - name: Debug dependency structure
         run: |
-          echo "Building application..."
-          npm run build
+          echo "Debugging dependency structure..."
+          ls -la node_modules/@hookform
+          ls -la node_modules/firebase
+          ls -la node_modules/papaparse
+          ls -la node_modules/recharts || echo "recharts not found"
+          
+          # Check for nested dependencies
+          find node_modules -name "resolvers" | grep hookform
+          find node_modules -name "auth" | grep firebase
+          
+          # Check package.json resolution
+          echo "Checking package resolution..."
+          node -e "console.log('Firebase:', require.resolve('firebase/auth'))"
+          node -e "console.log('Hookform:', require.resolve('@hookform/resolvers/zod'))"
+          node -e "console.log('Papaparse:', require.resolve('papaparse'))"
+          node -e "console.log('Recharts:', require.resolve('recharts'))" || echo "Recharts not resolvable"
+
+      - name: Build application with verbose logging
+        run: |
+          echo "Building application with verbose logging..."
+          # Set environment variable for more verbose Vite output
+          export VITE_DEBUG=true
+          # Run build with --debug flag
+          npm run build -- --debug
         env:
           NODE_ENV: production
-          NODE_OPTIONS: "--max_old_space_size=4096"
+          NODE_OPTIONS: "--max_old_space_size=8192"
 
       - name: Create deployment package
         run: |
@@ -81,84 +104,28 @@ jobs:
           
           # Copy essential files
           cp -r dist deployment/
-          cp web.config deployment/
-          cp server/azure-entry.js deployment/
           
-          # Create a production package.json
-          cat > deployment/package.json << EOF
-          {
-            "name": "sales-inquiry-azure",
-            "version": "1.0.0",
-            "type": "module",
-            "engines": {
-              "node": ">=20.0.0"
-            },
-            "scripts": {
-              "start": "node azure-entry.js"
-            },
-            "dependencies": {
-              "@hookform/resolvers": "^3.3.4",
-              "@tanstack/react-query": "^5.76.1",
-              "date-fns": "^2.30.0",
-              "express": "^4.18.2",
-              "firebase": "^11.7.3",
-              "gapi-script": "^1.2.0",
-              "lucide-react": "^0.511.0",
-              "papaparse": "^5.5.2",
-              "react": "^18.2.0",
-              "react-dom": "^18.2.0",
-              "react-hook-form": "^7.49.3",
-              "react-icons": "^5.5.0",
-              "wouter": "^3.7.0",
-              "zod": "^3.22.4"
-            }
-          }
-          EOF
-          
-          # Create startup script for Azure
-          cat > deployment/startup.js << EOF
-          // Azure startup script
-          console.log('Starting application via startup.js...');
-          import('./azure-entry.js')
-            .then(() => console.log('Application started successfully'))
-            .catch(err => {
-              console.error('Failed to start application:', err);
-              process.exit(1);
-            });
-          EOF
-          
-          # Create a basic .env file
-          cat > deployment/.env << EOF
-          NODE_ENV=production
-          PORT=8080
-          EOF
-          
-          # Install production dependencies
-          cd deployment
-          npm install --omit=dev --no-package-lock
-          
-          # Create web.config if it doesn't exist
-          if [ ! -f "web.config" ]; then
-            cat > web.config << EOF
+          # Create web.config for Azure
+          cat > deployment/web.config << EOF
           <?xml version="1.0" encoding="utf-8"?>
           <configuration>
             <system.webServer>
               <handlers>
-                <add name="iisnode" path="startup.js" verb="*" modules="iisnode" />
+                <add name="iisnode" path="server.js" verb="*" modules="iisnode" />
               </handlers>
               <rewrite>
                 <rules>
-                  <rule name="NodeInspector" patternSyntax="ECMAScript" stopProcessing="true">
-                    <match url="^startup.js\/debug[\/]?" />
-                  </rule>
                   <rule name="StaticContent">
-                    <action type="Rewrite" url="dist/public{REQUEST_URI}" />
+                    <action type="Rewrite" url="public{REQUEST_URI}" />
+                    <conditions>
+                      <add input="{REQUEST_FILENAME}" matchType="IsFile" />
+                    </conditions>
                   </rule>
                   <rule name="DynamicContent">
                     <conditions>
                       <add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true" />
                     </conditions>
-                    <action type="Rewrite" url="startup.js" />
+                    <action type="Rewrite" url="server.js" />
                   </rule>
                 </rules>
               </rewrite>
@@ -170,7 +137,51 @@ jobs:
             </system.webServer>
           </configuration>
           EOF
-          fi
+          
+          # Create server.js for serving static files
+          cat > deployment/server.js << EOF
+          import express from 'express';
+          import path from 'path';
+          import { fileURLToPath } from 'url';
+
+          const __dirname = path.dirname(fileURLToPath(import.meta.url));
+          const app = express();
+          const PORT = process.env.PORT || 8080;
+
+          // Serve static files
+          app.use(express.static(path.join(__dirname, 'public')));
+
+          // Serve index.html for all routes (SPA fallback)
+          app.get('*', (req, res) => {
+            res.sendFile(path.join(__dirname, 'public', 'index.html'));
+          });
+
+          app.listen(PORT, () => {
+            console.log(\`Server running on port \${PORT}\`);
+          });
+          EOF
+          
+          # Create a production package.json
+          cat > deployment/package.json << EOF
+          {
+            "name": "sales-inquiry-azure",
+            "version": "1.0.0",
+            "type": "module",
+            "engines": {
+              "node": ">=20.0.0"
+            },
+            "scripts": {
+              "start": "node server.js"
+            },
+            "dependencies": {
+              "express": "^4.18.2"
+            }
+          }
+          EOF
+          
+          # Install only express in the deployment folder
+          cd deployment
+          npm install --omit=dev --no-package-lock
           
           # Zip everything for deployment
           zip -r ../release.zip ./*
