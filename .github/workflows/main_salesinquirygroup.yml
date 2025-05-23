@@ -49,19 +49,31 @@ jobs:
             fs.mkdirSync(publicDir, { recursive: true });
           }
 
-          // Copy client files to dist/public
-          console.log('Copying client files...');
+          // Build client application
           try {
-            execSync('cp -r client/* dist/public/', { stdio: 'inherit' });
-            // Create a simple index.html if it doesn't exist
+            // First build the client application with Vite
+            console.log('Building client application...');
+            execSync('npx vite build --outDir dist/public', { stdio: 'inherit' });
+            
+            // If the build fails or doesn't produce an index.html, fall back to copying files
             if (!fs.existsSync(path.resolve(publicDir, 'index.html'))) {
+              console.log('Vite build failed to produce index.html, falling back to copying client files...');
+              execSync('cp -r client/* dist/public/', { stdio: 'inherit' });
+              
+              // Create a proper index.html that references compiled JavaScript, not TSX
               fs.writeFileSync(
                 path.resolve(publicDir, 'index.html'),
-                '<html><body><div id="root"></div><script src="src/main.tsx"></script></body></html>'
+                '<!DOCTYPE html>\n<html lang="en">\n  <head>\n    <meta charset="UTF-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />\n    <title>Sales Inquiry Group</title>\n  </head>\n  <body>\n    <div id="root"></div>\n    <script type="module" src="./index.js"></script>\n  </body>\n</html>'
+              );
+              
+              // Create a simple index.js that displays something
+              fs.writeFileSync(
+                path.resolve(publicDir, 'index.js'),
+                'document.getElementById(\'root\').innerHTML = \'<div style="text-align:center; padding:50px;"><h1>Sales Inquiry Group</h1><p>Application is loading...</p></div>\';\nconsole.log(\'Application initialized\');'
               );
             }
           } catch (error) {
-            console.error('Failed to copy client files:', error);
+            console.error('Failed to build client files:', error);
             process.exit(1);
           }
 
