@@ -32,7 +32,10 @@ export default defineConfig({
       "lucide-react",
       "react-icons",
       "react-icons/si",
-      "@tanstack/react-query"
+      "@tanstack/react-query",
+      "firebase",
+      "firebase/auth",
+      "gapi-script"
     ]
   },
   server: {

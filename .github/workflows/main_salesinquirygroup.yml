@@ -32,6 +32,8 @@ jobs:
           ls -la node_modules/lucide-react || npm install lucide-react
           ls -la node_modules/react-icons || npm install react-icons
           ls -la node_modules/@tanstack/react-query || npm install @tanstack/react-query
+          ls -la node_modules/firebase || npm install firebase
+          ls -la node_modules/gapi-script || npm install gapi-script
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
@@ -65,6 +67,8 @@ jobs:
             "dependencies": {
               "@tanstack/react-query": "^5.76.1",
               "express": "^4.18.2",
+              "firebase": "^11.7.3",
+              "gapi-script": "^1.2.0",
               "lucide-react": "^0.511.0",
               "react": "^18.2.0",
               "react-dom": "^18.2.0",
