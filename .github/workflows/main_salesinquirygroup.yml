@@ -24,7 +24,14 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          npm ci
+          # Verify critical dependencies are installed
+          ls -la node_modules/react || npm install react react-dom
+          ls -la node_modules/wouter || npm install wouter
+          ls -la node_modules/lucide-react || npm install lucide-react
+          ls -la node_modules/react-icons || npm install react-icons
+          ls -la node_modules/@tanstack/react-query || npm install @tanstack/react-query
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
@@ -56,6 +63,7 @@ jobs:
               "start": "node dist/azure-entry.js"
             },
             "dependencies": {
+              "@tanstack/react-query": "^5.76.1",
               "express": "^4.18.2",
               "lucide-react": "^0.511.0",
               "react": "^18.2.0",
