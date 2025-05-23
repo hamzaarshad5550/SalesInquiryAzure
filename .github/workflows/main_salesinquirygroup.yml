@@ -185,17 +185,17 @@ jobs:
           console.log('Build preparation complete!');
           EOF
 
-      - name: Install root dependencies
+      - name: Install dependencies
         run: |
-          echo "Installing root dependencies..."
-          npm ci --no-audit
+          echo "Installing dependencies with npm install..."
+          npm install --no-audit
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
       - name: Install Radix UI dependencies explicitly
         run: |
           echo "Installing Radix UI dependencies explicitly..."
-          npm install @radix-ui/react-slot @radix-ui/react-popover @radix-ui/react-dialog @radix-ui/react-select @radix-ui/react-toast @radix-ui/react-scroll-area @radix-ui/react-aspect-ratio @radix-ui/react-alert-dialog @radix-ui/react-avatar @radix-ui/react-checkbox @radix-ui/react-dropdown-menu @radix-ui/react-label @radix-ui/react-separator @radix-ui/react-switch @radix-ui/react-tabs @radix-ui/react-radio-group @radix-ui/react-progress @radix-ui/react-collapsible
+          npm install @radix-ui/react-slot @radix-ui/react-popover @radix-ui/react-dialog @radix-ui/react-select @radix-ui/react-toast @radix-ui/react-scroll-area @radix-ui/react-aspect-ratio @radix-ui/react-alert-dialog @radix-ui/react-avatar @radix-ui/react-checkbox @radix-ui/react-dropdown-menu @radix-ui/react-label @radix-ui/react-separator @radix-ui/react-switch @radix-ui/react-tabs @radix-ui/react-radio-group @radix-ui/react-progress @radix-ui/react-collapsible @supabase/supabase-js
 
       - name: Verify other critical dependencies
         run: |
