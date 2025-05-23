@@ -185,8 +185,10 @@ jobs:
           // Build frontend
           console.log('Building frontend...');
           try {
-            // Remove the --force flag as it's not supported in Vite 4.5.0
-            execSync('npx vite build', { stdio: 'inherit' });
+            // Ensure Vite is properly installed before building
+            execSync('npm list vite || npm install vite@4.5.0 --no-audit', { stdio: 'inherit' });
+            // Use the specific Vite version we installed
+            execSync('npx vite@4.5.0 build', { stdio: 'inherit' });
           } catch (error) {
             console.error('Failed to build frontend:', error);
             process.exit(1);
