@@ -27,7 +27,8 @@ try {
 
 // Import and start the main server
 try {
-  const serverPath = resolve(process.cwd(), 'dist', 'index.js');
+  // In Azure, the index.js file is in the dist directory
+  const serverPath = './dist/index.js';
   console.log('Loading server from:', serverPath);
   
   // Import the server module
@@ -37,11 +38,33 @@ try {
     })
     .catch(err => {
       console.error('Failed to load server module:', err);
-      process.exit(1);
+      
+      // Fallback to serving static files if server fails to load
+      console.log('Attempting to serve static files only...');
+      import('express').then(({ default: express }) => {
+        const app = express();
+        const port = process.env.PORT || 8080;
+        
+        // Serve static files from the public directory
+        app.use(express.static(resolve(process.cwd(), 'dist', 'public')));
+        
+        // Serve index.html for all routes (SPA fallback)
+        app.get('*', (req, res) => {
+          res.sendFile(resolve(process.cwd(), 'dist', 'public', 'index.html'));
+        });
+        
+        app.listen(port, () => {
+          console.log(`Fallback static server running on port ${port}`);
+        });
+      }).catch(fallbackErr => {
+        console.error('Failed to start fallback server:', fallbackErr);
+        process.exit(1);
+      });
     });
 } catch (err) {
   console.error('Error starting server:', err);
   process.exit(1);
 }
+
 
 

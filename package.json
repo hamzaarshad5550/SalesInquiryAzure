@@ -8,11 +8,12 @@
   "scripts": {
     "dev": "tsx server/index.ts",
     "build": "vite build && esbuild server/index.ts server/azure-entry.js --platform=node --packages=external --bundle --format=esm --outdir=dist",
-    "start": "node dist/azure-entry.js"
+    "start": "node startup.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.4",
     "@tanstack/react-query": "^5.76.1",
+    "date-fns": "^2.30.0",
     "express": "^4.18.2",
     "firebase": "^11.7.3",
     "gapi-script": "^1.2.0",

@@ -13,11 +13,12 @@ jobs:
       contents: read
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
-      - name: Set up Node.js version
+      - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20.x'
@@ -25,36 +26,65 @@ jobs:
 
       - name: Install dependencies
         run: |
-          npm ci
-          # Verify critical dependencies are installed
-          ls -la node_modules/react || npm install react react-dom
-          ls -la node_modules/wouter || npm install wouter
-          ls -la node_modules/lucide-react || npm install lucide-react
-          ls -la node_modules/react-icons || npm install react-icons
-          ls -la node_modules/@tanstack/react-query || npm install @tanstack/react-query
-          ls -la node_modules/firebase || npm install firebase
-          ls -la node_modules/gapi-script || npm install gapi-script
-          ls -la node_modules/papaparse || npm install papaparse @types/papaparse
-          ls -la node_modules/@hookform/resolvers || npm install @hookform/resolvers react-hook-form zod
+          echo "Installing dependencies..."
+          npm ci --no-audit
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
+
+      - name: Verify critical dependencies
+        run: |
+          echo "Verifying critical dependencies..."
+          # Create a list of required dependencies
+          DEPS=(
+            "react"
+            "react-dom"
+            "wouter"
+            "lucide-react"
+            "react-icons"
+            "@tanstack/react-query"
+            "firebase"
+            "gapi-script"
+            "papaparse"
+            "@hookform/resolvers"
+            "react-hook-form"
+            "zod"
+            "date-fns"
+            "express"
+          )
+          
+          # Check each dependency and install if missing
+          for DEP in "${DEPS[@]}"; do
+            if [ ! -d "node_modules/$DEP" ]; then
+              echo "Installing missing dependency: $DEP"
+              npm install "$DEP"
+            else
+              echo "✓ $DEP is installed"
+            fi
+          done
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
       - name: Build application
-        run: npm run build
+        run: |
+          echo "Building application..."
+          npm run build
         env:
           NODE_ENV: production
           NODE_OPTIONS: "--max_old_space_size=4096"
 
       - name: Create deployment package
         run: |
-          # Create a production-ready package
+          echo "Creating deployment package..."
+          
+          # Create deployment directory
           mkdir -p deployment
           
-          # Copy built files
+          # Copy essential files
           cp -r dist deployment/
           cp web.config deployment/
+          cp server/azure-entry.js deployment/
           
-          # Create a minimal package.json with start script and runtime dependencies
+          # Create a production package.json
           cat > deployment/package.json << EOF
           {
             "name": "sales-inquiry-azure",
@@ -64,11 +94,12 @@ jobs:
               "node": ">=20.0.0"
             },
             "scripts": {
-              "start": "node dist/azure-entry.js"
+              "start": "node azure-entry.js"
             },
             "dependencies": {
               "@hookform/resolvers": "^3.3.4",
               "@tanstack/react-query": "^5.76.1",
+              "date-fns": "^2.30.0",
               "express": "^4.18.2",
               "firebase": "^11.7.3",
               "gapi-script": "^1.2.0",
@@ -84,17 +115,62 @@ jobs:
           }
           EOF
           
-          # Install only the essential dependencies
-          cd deployment
-          npm install --no-package-lock --production
-          
-          # Create a startup script for Azure
-          echo "console.log('Starting application...');" > startup.js
-          echo "import('./dist/azure-entry.js').catch(err => console.error('Failed to start:', err));" >> startup.js
+          # Create startup script for Azure
+          cat > deployment/startup.js << EOF
+          // Azure startup script
+          console.log('Starting application via startup.js...');
+          import('./azure-entry.js')
+            .then(() => console.log('Application started successfully'))
+            .catch(err => {
+              console.error('Failed to start application:', err);
+              process.exit(1);
+            });
+          EOF
           
           # Create a basic .env file
-          echo "NODE_ENV=production" > .env
-          echo "PORT=8080" >> .env
+          cat > deployment/.env << EOF
+          NODE_ENV=production
+          PORT=8080
+          EOF
+          
+          # Install production dependencies
+          cd deployment
+          npm install --omit=dev --no-package-lock
+          
+          # Create web.config if it doesn't exist
+          if [ ! -f "web.config" ]; then
+            cat > web.config << EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <configuration>
+            <system.webServer>
+              <handlers>
+                <add name="iisnode" path="startup.js" verb="*" modules="iisnode" />
+              </handlers>
+              <rewrite>
+                <rules>
+                  <rule name="NodeInspector" patternSyntax="ECMAScript" stopProcessing="true">
+                    <match url="^startup.js\/debug[\/]?" />
+                  </rule>
+                  <rule name="StaticContent">
+                    <action type="Rewrite" url="dist/public{REQUEST_URI}" />
+                  </rule>
+                  <rule name="DynamicContent">
+                    <conditions>
+                      <add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true" />
+                    </conditions>
+                    <action type="Rewrite" url="startup.js" />
+                  </rule>
+                </rules>
+              </rewrite>
+              <iisnode 
+                nodeProcessCommandLine="node"
+                watchedFiles="web.config;*.js"
+                loggingEnabled="true"
+                logDirectory="iisnode" />
+            </system.webServer>
+          </configuration>
+          EOF
+          fi
           
           # Zip everything for deployment
           zip -r ../release.zip ./*

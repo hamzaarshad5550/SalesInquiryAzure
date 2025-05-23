@@ -2,7 +2,7 @@
 console.log('Starting application via startup.js...');
 
 // Import the main entry point
-import('./dist/azure-entry.js')
+import('./azure-entry.js')
   .then(() => {
     console.log('Application started successfully');
   })
