@@ -36,7 +36,10 @@ export default defineConfig({
       "firebase",
       "firebase/auth",
       "gapi-script",
-      "papaparse"
+      "papaparse",
+      "@hookform/resolvers/zod",
+      "react-hook-form",
+      "zod"
     ]
   },
   server: {

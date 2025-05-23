@@ -35,6 +35,7 @@ jobs:
           ls -la node_modules/firebase || npm install firebase
           ls -la node_modules/gapi-script || npm install gapi-script
           ls -la node_modules/papaparse || npm install papaparse @types/papaparse
+          ls -la node_modules/@hookform/resolvers || npm install @hookform/resolvers react-hook-form zod
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
@@ -66,6 +67,7 @@ jobs:
               "start": "node dist/azure-entry.js"
             },
             "dependencies": {
+              "@hookform/resolvers": "^3.3.4",
               "@tanstack/react-query": "^5.76.1",
               "express": "^4.18.2",
               "firebase": "^11.7.3",
@@ -74,8 +76,10 @@ jobs:
               "papaparse": "^5.5.2",
               "react": "^18.2.0",
               "react-dom": "^18.2.0",
+              "react-hook-form": "^7.49.3",
               "react-icons": "^5.5.0",
-              "wouter": "^3.7.0"
+              "wouter": "^3.7.0",
+              "zod": "^3.22.4"
             }
           }
           EOF
