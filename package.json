@@ -8,8 +8,8 @@
   "scripts": {
     "dev": "tsx server/index.ts",
     "build": "npm run build:frontend && npm run build:backend",
-    "build:frontend": "vite build",
-    "build:backend": "esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "build:frontend": "npx vite build",
+    "build:backend": "npx esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "node dist/index.js",
     "prebuild": "node build-scripts/prepare-build.mjs"
   },

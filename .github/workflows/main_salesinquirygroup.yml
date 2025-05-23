@@ -296,20 +296,46 @@ jobs:
           # Run the patch
           node vite-patch.mjs
 
-      - name: Create fixed build script
+      - name: Create direct build script
         run: |
-          cat > fixed-build.mjs << 'EOF'
-          // ES Module compatible build script
-          import fs from 'fs';
+          cat > direct-build.mjs << 'EOF'
+          // Direct build script that doesn't rely on npm scripts
           import { execSync } from 'child_process';
+          import fs from 'fs';
           import path from 'path';
           import { fileURLToPath } from 'url';
 
           const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-          console.log('Creating fixed Vite config...');
+          console.log('Starting direct build process...');
+
+          // Install dependencies
+          console.log('Installing dependencies...');
+          try {
+            execSync('npm install --no-audit', { stdio: 'inherit' });
+          } catch (error) {
+            console.error('Failed to install dependencies:', error);
+            process.exit(1);
+          }
+
+          // Install Vite explicitly
+          console.log('Installing Vite explicitly...');
+          try {
+            execSync('npm install vite@4.5.0 --no-audit', { stdio: 'inherit' });
+          } catch (error) {
+            console.error('Failed to install Vite:', error);
+          }
+
+          // Install Radix UI and Supabase explicitly
+          console.log('Installing Radix UI and Supabase explicitly...');
+          try {
+            execSync('npm install @radix-ui/react-slot @radix-ui/react-popover @radix-ui/react-dialog @radix-ui/react-select @radix-ui/react-toast @radix-ui/react-scroll-area @radix-ui/react-aspect-ratio @radix-ui/react-alert-dialog @radix-ui/react-avatar @radix-ui/react-checkbox @radix-ui/react-dropdown-menu @radix-ui/react-label @radix-ui/react-separator @radix-ui/react-switch @radix-ui/react-tabs @radix-ui/react-radio-group @radix-ui/react-progress @radix-ui/react-collapsible @supabase/supabase-js', { stdio: 'inherit' });
+          } catch (error) {
+            console.error('Failed to install Radix UI and Supabase:', error);
+          }
 
           // Create a fixed vite.config.js file
+          console.log('Creating fixed Vite config...');
           const viteConfig = `
           import { defineConfig } from "vite";
           import react from "@vitejs/plugin-react";
@@ -430,8 +456,8 @@ jobs:
           // Write the fixed config
           fs.writeFileSync('vite.config.js', viteConfig);
 
-          // Create a modified client/src/lib/supabase.ts file
-          console.log('Creating modified supabase client...');
+          // Create a simplified supabase client
+          console.log('Creating simplified supabase client...');
           const supabaseDir = path.resolve('client/src/lib');
           
           // Ensure directory exists
@@ -465,22 +491,14 @@ jobs:
           
           fs.writeFileSync(path.join(supabaseDir, 'supabase.ts'), supabaseClient);
 
-          // Install Supabase explicitly
-          console.log('Installing Supabase...');
-          try {
-            execSync('npm install @supabase/supabase-js', { stdio: 'inherit' });
-          } catch (error) {
-            console.error('Failed to install Supabase:', error);
-          }
-
           // Run the build
           console.log('Running build...');
           try {
-            // Build frontend
-            execSync('npm run build:frontend', { stdio: 'inherit' });
+            // Use npx to run vite directly from node_modules
+            execSync('npx vite build --force', { stdio: 'inherit' });
             
             // Build backend
-            execSync('npm run build:backend', { stdio: 'inherit' });
+            execSync('npx esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist', { stdio: 'inherit' });
             
             console.log('Build completed successfully!');
           } catch (error) {
@@ -489,10 +507,10 @@ jobs:
           }
           EOF
 
-      - name: Run fixed build script
+      - name: Run direct build script
         run: |
-          echo "Running fixed build script..."
-          node fixed-build.mjs
+          echo "Running direct build script..."
+          node direct-build.mjs
         env:
           NODE_ENV: production
           NODE_OPTIONS: "--max_old_space_size=8192"
