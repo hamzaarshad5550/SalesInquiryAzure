@@ -68,63 +68,53 @@ jobs:
             '<!DOCTYPE html>\n<html lang="en">\n  <head>\n    <meta charset="UTF-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />\n    <title>Sales Inquiry Group</title>\n    <style>body{font-family:system-ui,-apple-system,sans-serif;background:#f5f5f5;display:flex;justify-content:center;align-items:center;height:100vh;margin:0}.container{text-align:center;padding:2rem;background:white;border-radius:8px;box-shadow:0 4px 6px rgba(0,0,0,0.1);max-width:500px}</style>\n  </head>\n  <body>\n    <div class="container">\n      <h1>Sales Inquiry Group</h1>\n      <p>Application is loading...</p>\n    </div>\n    <script>console.log("Application initialized");</script>\n  </body>\n</html>'
           );
 
-          // Create a simplified server file
+          // Create a simplified server file directly in the dist directory
           console.log('Creating simplified server file...');
-          const serverDir = path.resolve(__dirname, 'server');
           
-          // Check if server directory exists
-          if (!fs.existsSync(serverDir)) {
-            fs.mkdirSync(serverDir, { recursive: true });
-          }
-          
-          // Create a simple server file
-          const indexTs = "import express from 'express';\nimport path from 'path';\nimport { fileURLToPath } from 'url';\n\nconst __dirname = path.dirname(fileURLToPath(import.meta.url));\nconst app = express();\nconst PORT = process.env.PORT || 5000;\n\n// Serve static files\napp.use(express.static(path.join(__dirname, 'public')));\n\n// API endpoint\napp.get('/api/status', (req, res) => {\n  res.json({ status: 'ok', message: 'Server is running' });\n});\n\n// Catch-all route to serve the SPA\napp.get('*', (req, res) => {\n  res.sendFile(path.join(__dirname, 'public', 'index.html'));\n});\n\napp.listen(PORT, () => {\n  console.log(`Server running on port ${PORT}`);\n});\n";
-          fs.writeFileSync(path.resolve(serverDir, 'index.ts'), indexTs);
+          // Create a simple server file directly in JavaScript (no TypeScript)
+          const serverJs = `
+          import express from 'express';
+          import path from 'path';
+          import { fileURLToPath } from 'url';
 
-          // Create a temporary tsconfig.json for the build
-          console.log('Creating temporary tsconfig.json...');
-          const tsConfig = {
-            "compilerOptions": {
-              "target": "es2020",
-              "module": "esnext",
-              "moduleResolution": "node",
-              "esModuleInterop": true,
-              "outDir": "./dist",
-              "strict": true,
-              "skipLibCheck": true,
-              "types": ["node", "express"]
-            },
-            "include": ["server/**/*"]
+          const __dirname = path.dirname(fileURLToPath(import.meta.url));
+          const app = express();
+          const PORT = process.env.PORT || 5000;
+
+          // Serve static files
+          app.use(express.static(path.join(__dirname, 'public')));
+
+          // API endpoint
+          app.get('/api/status', (req, res) => {
+            res.json({ status: 'ok', message: 'Server is running' });
+          });
+
+          // Catch-all route to serve the SPA
+          app.get('*', (req, res) => {
+            res.sendFile(path.join(__dirname, 'public', 'index.html'));
+          });
+
+          app.listen(PORT, () => {
+            console.log(\`Server running on port \${PORT}\`);
+          });
+          `;
+          
+          fs.writeFileSync(path.resolve(distDir, 'index.js'), serverJs);
+          
+          // Create a simple package.json for the server
+          const packageJson = {
+            "type": "module",
+            "dependencies": {
+              "express": "^4.18.2"
+            }
           };
-          fs.writeFileSync('tsconfig.build.json', JSON.stringify(tsConfig, null, 2));
-
-          // Build backend using TypeScript directly
-          console.log('Building backend...');
-          try {
-            // Install necessary type definitions
-            execSync('npm install --no-save @types/node @types/express', { stdio: 'inherit' });
-            
-            // Create a simple package.json for the server
-            const packageJson = {
-              "type": "module",
-              "dependencies": {
-                "express": "^4.18.2"
-              }
-            };
-            fs.writeFileSync(path.resolve(distDir, 'package.json'), JSON.stringify(packageJson, null, 2));
-            
-            // Use TypeScript to compile the server with the temporary config
-            execSync('npx tsc -p tsconfig.build.json', { stdio: 'inherit' });
-            
-            // Create a simple entry point for Azure
-            fs.writeFileSync(
-              path.resolve(__dirname, 'server.js'),
-              'import "./dist/index.js";'
-            );
-          } catch (error) {
-            console.error('Failed to build backend:', error);
-            process.exit(1);
-          }
+          fs.writeFileSync(path.resolve(distDir, 'package.json'), JSON.stringify(packageJson, null, 2));
+          
+          // Create a simple entry point for Azure
+          fs.writeFileSync(
+            path.resolve(__dirname, 'server.js'),
+            'import "./dist/index.js";'
+          );
 
           console.log('Build completed successfully!');
           EOF
