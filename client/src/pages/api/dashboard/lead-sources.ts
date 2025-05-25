@@ -3,63 +3,18 @@ import { supabase } from '@/lib/supabase';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const { period = 'monthly' } = req.query;
-    
-    // First check if the source column exists
-    const { data: columnInfo, error: columnError } = await supabase
+    // Get leads with source information
+    // This is a simplified example - in a real app, you'd query your leads table
+    const { data: leads, error } = await supabase
       .from('contacts')
-      .select()
-      .limit(1);
-    
-    // Determine which field to use for source
-    let sourceField = 'source';
-    if (columnError || (columnInfo && columnInfo.length > 0 && !('source' in columnInfo[0]))) {
-      // Try alternative field names
-      const possibleFields = ['lead_source', 'leadSource', 'source_type', 'sourceType', 'origin'];
-      for (const field of possibleFields) {
-        if (columnInfo && columnInfo.length > 0 && field in columnInfo[0]) {
-          sourceField = field;
-          console.log(`Using '${field}' as source field`);
-          break;
-        }
-      }
-    }
-    
-    // Get all contacts
-    const { data: contacts, error } = await supabase
-      .from('contacts')
-      .select('*');
+      .select('source');
     
     if (error) throw error;
     
-    // Filter by time range
-    const now = new Date();
-    let timeFilter = 30; // Default to monthly
-    
-    if (period === 'quarterly') {
-      timeFilter = 90;
-    } else if (period === 'yearly') {
-      timeFilter = 365;
-    } else if (period === 'weekly') {
-      timeFilter = 7;
-    }
-    
-    const filteredContacts = contacts.filter(contact => {
-      const contactDate = new Date(contact.created_at || contact.createdAt);
-      const daysDiff = Math.floor((now.getTime() - contactDate.getTime()) / (1000 * 60 * 60 * 24));
-      return daysDiff <= timeFilter;
-    });
-    
-    // Count by source
+    // Count leads by source
     const sourceCount: Record<string, number> = {};
-    filteredContacts.forEach(contact => {
-      // Try to get the source using the determined field or fallbacks
-      const source = contact[sourceField] || 
-                    contact.source || 
-                    contact.lead_source || 
-                    contact.leadSource || 
-                    'Unknown';
-      
+    leads.forEach(lead => {
+      const source = lead.source || 'Unknown';
       sourceCount[source] = (sourceCount[source] || 0) + 1;
     });
     
@@ -72,17 +27,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       "hsl(var(--success))"
     ];
     
-    const leadSourcesData = Object.entries(sourceCount)
-      .map(([source, count], index) => ({
-        name: source || 'Unknown',
-        value: count,
+    const leadSources = Object.entries(sourceCount)
+      .map(([name, value], index) => ({
+        name,
+        value,
         color: COLORS[index % COLORS.length]
       }))
-      .sort((a, b) => b.value - a.value);
+      .sort((a, b) => b.value - a.value); // Sort by count descending
     
-    res.status(200).json(leadSourcesData);
+    res.status(200).json(leadSources);
   } catch (error) {
     console.error('Error fetching lead sources:', error);
-    res.status(500).json([]);
+    res.status(500).json({ error: 'Failed to fetch lead sources' });
   }
 }

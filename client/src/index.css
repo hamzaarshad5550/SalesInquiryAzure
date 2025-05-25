@@ -14,15 +14,6 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
     
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 222 47% 11%;
-    --sidebar-primary: 246 85.5% 67.1%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 5.9% 10%;
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 214.3 31.8% 91.4%;
-    --sidebar-ring: 246 85.5% 67.1%;
-    
     --primary: 246 85.5% 67.1%;
     --primary-foreground: 0 0% 100%;
     
@@ -34,135 +25,21 @@
     
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    
-    --success: 142 70.6% 45.3%;
-    --success-foreground: 0 0% 98%;
-    
-    --warning: 38 92.7% 50.2%;
-    --warning-foreground: 0 0% 98%;
     
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 246 85.5% 67.1%;
     
-    --chart-1: 246 85.5% 67.1%;
-    --chart-2: 199 89.3% 48.2%;
-    --chart-3: 173 79.1% 40.2%;
-    --chart-4: 142 70.6% 45.3%;
-    --chart-5: 38 92.7% 50.2%;
-    
     --radius: 0.5rem;
   }
-  
-  .dark {
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
-    
-    --card: 228 26% 23%;
-    --card-foreground: 210 40% 98%;
-    
-    --popover: 228 26% 23%;
-    --popover-foreground: 210 40% 98%;
-    
-    --sidebar-background: 228 26% 23%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 246 85.5% 67.1%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 213 40% 98%;
-    --sidebar-accent-foreground: 222 47% 11%;
-    --sidebar-border: 215 27.9% 16.9%;
-    --sidebar-ring: 246 85.5% 67.1%;
-    
-    --primary: 246 85.5% 67.1%;
-    --primary-foreground: 0 0% 100%;
-    
-    --secondary: 199 89.3% 48.2%;
-    --secondary-foreground: 0 0% 100%;
-    
-    --accent: 173 79.1% 40.2%;
-    --accent-foreground: 0 0% 100%;
-    
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    
-    --success: 142 70.6% 45.3%;
-    --success-foreground: 0 0% 98%;
-    
-    --warning: 38 92.7% 50.2%;
-    --warning-foreground: 0 0% 98%;
-    
-    --border: 215 27.9% 16.9%;
-    --input: 215 27.9% 16.9%;
-    --ring: 246 85.5% 67.1%;
-    
-    --chart-1: 246 85.5% 67.1%;
-    --chart-2: 199 89.3% 48.2%;
-    --chart-3: 173 79.1% 40.2%;
-    --chart-4: 142 70.6% 45.3%;
-    --chart-5: 38 92.7% 50.2%;
-  }
-  
+}
+
+@layer base {
   * {
-    border-color: hsl(var(--border));
+    @apply border-border;
   }
   
-  html, body {
-    height: 100%;
-    overflow-x: hidden;
-  }
-
   body {
-    @apply font-sans antialiased bg-background text-foreground;
-    display: flex;
-    flex-direction: column;
-  }
-
-  #root {
-    display: flex;
-    flex-direction: column;
-    min-height: 100vh;
-  }
-
-  /* Ensure email content doesn't overflow */
-  .break-words {
-    word-break: break-word;
-    overflow-wrap: break-word;
-  }
-
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;
-  }
-
-  .scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-
-  .pipeline-column {
-    min-width: 280px;
-  }
-
-  /* Email-specific styles */
-  .email-subject {
-    display: -webkit-box;
-    -webkit-line-clamp: 1;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .email-from {
-    display: -webkit-box;
-    -webkit-line-clamp: 1;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  /* Responsive adjustments */
-  @media (max-width: 640px) {
-    .email-list-container {
-      height: calc(100vh - 220px);
-    }
+    @apply bg-background text-foreground;
   }
 }

@@ -161,6 +161,10 @@ try {
   
   async function buildApp() {
     try {
+      console.log('Starting Vite build process...');
+      console.log('Current directory:', process.cwd());
+      console.log('Build directory:', __dirname);
+      
       await build({
         configFile: false,
         root: path.resolve(__dirname, 'client'),
@@ -177,11 +181,13 @@ try {
           outDir: path.resolve(__dirname, "dist/public"),
           emptyOutDir: true,
           sourcemap: false,
-        }
+        },
+        logLevel: 'info' // Set to 'info' for more detailed logs
       });
       console.log('Build completed successfully');
     } catch (error) {
-      console.error('Build failed:', error);
+      console.error('Build failed with detailed error:');
+      console.error(error);
       process.exit(1);
     }
   }
@@ -193,10 +199,18 @@ try {
   fs.writeFileSync('vite-build.mjs', buildScript);
   
   // Install dependencies explicitly
+  console.log('Installing required dependencies...');
   execSync('npm install vite@4.5.0 @vitejs/plugin-react@4.0.0 --no-audit', { stdio: 'inherit' });
   
-  // Run the standalone build script
-  execSync('node vite-build.mjs', { stdio: 'inherit' });
+  // Run the standalone build script with detailed output
+  console.log('Running Vite build script...');
+  try {
+    execSync('node vite-build.mjs', { stdio: 'inherit' });
+  } catch (error) {
+    console.error('Failed to build frontend with detailed error:');
+    console.error(error);
+    process.exit(1);
+  }
 } catch (error) {
   console.error('Failed to build frontend:', error);
   process.exit(1);
@@ -212,6 +226,7 @@ try {
 }
 
 console.log('Build completed successfully!');
+
 
 
 

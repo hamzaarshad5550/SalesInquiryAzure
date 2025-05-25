@@ -1,3 +1,6 @@
+# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
+# More GitHub Actions for Azure: https://github.com/Azure/actions
+
 name: Build and deploy Node.js app to Azure Web App - SalesInquiryGroup
 
 on:
@@ -10,132 +13,30 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: read #This is required for actions/checkout
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
+      - uses: actions/checkout@v4
 
       - name: Set up Node.js version
         uses: actions/setup-node@v3
         with:
-          node-version: '20.x'
+          node-version: '22.x'
 
-      - name: Install dependencies
+      - name: npm install, build, and test
         run: |
           npm install
-          # Explicitly install Tailwind CSS and related packages
-          npm install -D tailwindcss postcss autoprefixer tailwindcss-animate @tailwindcss/typography
-          # Verify Tailwind is installed
-          npx tailwindcss --help
-
-      - name: Create simplified build script
-        run: |
-          cat > build.js << 'EOF'
-          import { execSync } from 'child_process';
-          import fs from 'fs';
-          import path from 'path';
-          import { fileURLToPath } from 'url';
-
-          const __dirname = path.dirname(fileURLToPath(import.meta.url));
-          
-          console.log('Starting simplified build process...');
-
-          // Create dist directory
-          const distDir = path.resolve(__dirname, 'dist');
-          if (!fs.existsSync(distDir)) {
-            fs.mkdirSync(distDir, { recursive: true });
-          }
-          
-          const publicDir = path.resolve(distDir, 'public');
-          if (!fs.existsSync(publicDir)) {
-            fs.mkdirSync(publicDir, { recursive: true });
-          }
-
-          // Verify Tailwind CSS is installed
-          try {
-            console.log('Checking Tailwind CSS installation...');
-            execSync('npx tailwindcss --help', { stdio: 'inherit' });
-          } catch (error) {
-            console.error('Tailwind CSS is not properly installed, installing now...');
-            execSync('npm install -D tailwindcss postcss autoprefixer tailwindcss-animate @tailwindcss/typography', { stdio: 'inherit' });
-          }
-
-          // Build client application
-          try {
-            // First build the client application with Vite
-            console.log('Building client application...');
-            
-            // Create a simplified CSS file if needed
-            const cssDir = path.resolve(__dirname, 'client', 'src');
-            const cssFile = path.resolve(cssDir, 'index.css');
-            
-            if (!fs.existsSync(cssFile)) {
-              console.log('Creating simplified index.css file...');
-              fs.writeFileSync(
-                cssFile,
-                '@tailwind base;\n@tailwind components;\n@tailwind utilities;'
-              );
-            }
-            
-            // Run the build
-            execSync('npx vite build --outDir dist/public', { stdio: 'inherit' });
-            
-            // If the build fails or doesn't produce an index.html, fall back to copying files
-            if (!fs.existsSync(path.resolve(publicDir, 'index.html'))) {
-              console.log('Vite build failed to produce index.html, falling back to copying client files...');
-              execSync('cp -r client/* dist/public/', { stdio: 'inherit' });
-              
-              // Create a proper index.html that references compiled JavaScript, not TSX
-              fs.writeFileSync(
-                path.resolve(publicDir, 'index.html'),
-                '<!DOCTYPE html>\n<html lang="en">\n  <head>\n    <meta charset="UTF-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />\n    <title>Sales Inquiry Group</title>\n  </head>\n  <body>\n    <div id="root"></div>\n    <script type="module" src="./index.js"></script>\n  </body>\n</html>'
-              );
-              
-              // Create a simple index.js that displays something
-              fs.writeFileSync(
-                path.resolve(publicDir, 'index.js'),
-                'document.getElementById(\'root\').innerHTML = \'<div style="text-align:center; padding:50px;"><h1>Sales Inquiry Group</h1><p>Application is loading...</p></div>\';\nconsole.log(\'Application initialized\');'
-              );
-            }
-          } catch (error) {
-            console.error('Failed to build client files:', error);
-            process.exit(1);
-          }
-
-          // Build backend
-          console.log('Building backend...');
-          try {
-            execSync('npx esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist', { stdio: 'inherit' });
-          } catch (error) {
-            console.error('Failed to build backend:', error);
-            process.exit(1);
-          }
-
-          console.log('Build completed successfully!');
-          EOF
-
-      - name: Run simplified build
-        run: node build.js
+          npm run build --if-present
+          npm run test --if-present
 
       - name: Zip artifact for deployment
-        run: |
-          # Remove unnecessary files before zipping
-          rm -rf node_modules
-          rm -rf .git
-          # Install only production dependencies
-          npm ci --only=production
-          # Create a more optimized zip file
-          zip -r release.zip . -x "*.git*" "*.github*" "*.vscode*" "*.idea*" "*.DS_Store" "*.log"
+        run: zip release.zip ./* -r
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
           name: node-app
           path: release.zip
-          retention-days: 1
 
   deploy:
     runs-on: ubuntu-latest
@@ -155,9 +56,9 @@ jobs:
 
       - name: Unzip artifact for deployment
         run: unzip release.zip
-
+      
       - name: Login to Azure
-        uses: azure/login@v1
+        uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_886E565E15F54F64825AFC8382A0E7EA }}
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_D814736B79FA4FBC95BEDB87DF16ECCF }}
@@ -165,10 +66,9 @@ jobs:
 
       - name: 'Deploy to Azure Web App'
         id: deploy-to-webapp
-        uses: azure/webapps-deploy@v2
+        uses: azure/webapps-deploy@v3
         with:
           app-name: 'SalesInquiryGroup'
           slot-name: 'Production'
           package: .
-          startup-command: 'node server/azure-entry.js'
-            
+          
