@@ -48,7 +48,6 @@
     "react-hook-form": "^7.43.9",
     "react-icons": "^5.5.0",
     "recharts": "^2.15.3",
-    "sales-inquiry-app": "file:",
     "tailwind-merge": "^1.14.0",
     "wouter": "^2.11.0",
     "zod": "^3.21.4"
