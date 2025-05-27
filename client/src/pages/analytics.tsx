@@ -176,77 +176,9 @@ export default function Analytics() {
   const { data: salesPerformanceData, isLoading: isSalesPerformanceLoading, error: salesPerformanceError } = useQuery({
     queryKey: ['/api/dashboard/sales-performance', { period: timeRange }],
     queryFn: async () => {
-      try {
-        const { data, error } = await supabase.rpc('get_sales_performance_data', { 
-          p_period: timeRange 
-        });
-        
-        if (error) {
-          console.error("Supabase RPC error:", error);
-          throw error;
-        }
-        
-        // If the RPC doesn't exist yet, fall back to direct query
-        if (!data) {
-          // Get all deals
-          const { data: deals, error: dealsError } = await supabase
-            .from('deals')
-            .select('*');
-          
-          if (dealsError) throw dealsError;
-          
-          // Process deals to create performance data
-          const now = new Date();
-          const currentPeriodDeals: Record<string, number> = {};
-          const previousPeriodDeals: Record<string, number> = {};
-          
-          // Determine period length in days
-          let periodDays = 30; // default to monthly
-          if (timeRange === 'weekly') periodDays = 7;
-          if (timeRange === 'quarterly') periodDays = 90;
-          if (timeRange === 'yearly') periodDays = 365;
-          
-          deals.forEach(deal => {
-            if (!deal.created_at || !deal.status || deal.status !== 'closed_won') return;
-            
-            const dealDate = new Date(deal.created_at);
-            const monthYear = dealDate.toLocaleDateString('en-US', { 
-              month: 'short', 
-              year: 'numeric' 
-            });
-            
-            const daysDiff = Math.floor((now.getTime() - dealDate.getTime()) / (1000 * 60 * 60 * 24));
-            
-            if (daysDiff <= periodDays) {
-              // Current period
-              currentPeriodDeals[monthYear] = (currentPeriodDeals[monthYear] || 0) + Number(deal.value || 0);
-            } else if (daysDiff <= periodDays * 2) {
-              // Previous period
-              previousPeriodDeals[monthYear] = (previousPeriodDeals[monthYear] || 0) + Number(deal.value || 0);
-            }
-          });
-          
-          // Format for chart
-          const salesData = Object.keys({ ...currentPeriodDeals, ...previousPeriodDeals })
-            .sort((a, b) => {
-              const dateA = new Date(a);
-              const dateB = new Date(b);
-              return dateA.getTime() - dateB.getTime();
-            })
-            .map(date => ({
-              name: date,
-              current: currentPeriodDeals[date] || 0,
-              previous: previousPeriodDeals[date] || 0
-            }));
-          
-          return { salesData };
-        }
-        
-        return { salesData: data || [] };
-      } catch (error) {
-        console.error("Error fetching sales performance:", error);
-        throw error;
-      }
+      const res = await fetch(`/api/dashboard/sales-performance?period=${timeRange}`);
+      if (!res.ok) throw new Error('Failed to fetch sales performance data');
+      return res.json();
     },
     retry: 2
   });

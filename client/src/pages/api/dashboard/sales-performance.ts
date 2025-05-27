@@ -1,78 +1,100 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/db';
+import { deals, pipelineStages } from '@/shared/schema';
+import { eq, and, gte, lte } from 'drizzle-orm';
+import { subWeeks, subMonths, subQuarters, subYears, startOfDay, endOfDay } from 'date-fns';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const { period = 'monthly' } = req.query;
     
-    // Get deals with created_at and value
-    const { data: deals, error } = await supabase
-      .from('deals')
-      .select('created_at, value, status');
+    // Get the 'Closed Won' stage ID
+    const closedWonStage = await db.query.pipelineStages.findFirst({
+      where: eq(pipelineStages.name, 'Closed Won')
+    });
     
-    if (error) throw error;
-    
-    // Filter closed deals
-    const closedDeals = deals.filter(deal => deal.status === 'closed_won');
-    
-    // Group by month/week/etc based on period
-    const currentPeriodDeals: Record<string, number> = {};
-    const previousPeriodDeals: Record<string, number> = {};
+    if (!closedWonStage) {
+      throw new Error('Closed Won stage not found');
+    }
     
     const now = new Date();
-    let dateFormat: Intl.DateTimeFormatOptions;
-    let periodOffset: number;
+    let startDate: Date;
+    let previousStartDate: Date;
     
-    // Set date format and period offset based on selected period
+    // Calculate date ranges based on period
     switch(period) {
       case 'weekly':
-        dateFormat = { weekday: 'short' };
-        periodOffset = 7; // 7 days
+        startDate = subWeeks(now, 1);
+        previousStartDate = subWeeks(now, 2);
         break;
       case 'quarterly':
-        dateFormat = { month: 'short' };
-        periodOffset = 3; // 3 months
+        startDate = subQuarters(now, 1);
+        previousStartDate = subQuarters(now, 2);
         break;
       case 'yearly':
-        dateFormat = { month: 'short' };
-        periodOffset = 12; // 12 months
+        startDate = subYears(now, 1);
+        previousStartDate = subYears(now, 2);
         break;
       case 'monthly':
       default:
-        dateFormat = { day: '2-digit' };
-        periodOffset = 30; // ~1 month in days
+        startDate = subMonths(now, 1);
+        previousStartDate = subMonths(now, 2);
     }
     
-    // Process deals
-    closedDeals.forEach(deal => {
-      const dealDate = new Date(deal.created_at);
-      const formattedDate = new Intl.DateTimeFormat('en-US', dateFormat).format(dealDate);
-      const daysDiff = Math.floor((now.getTime() - dealDate.getTime()) / (1000 * 60 * 60 * 24));
-      
-      if (daysDiff <= periodOffset) {
-        // Current period
-        currentPeriodDeals[formattedDate] = (currentPeriodDeals[formattedDate] || 0) + Number(deal.value);
-      } else if (daysDiff <= periodOffset * 2) {
-        // Previous period
-        previousPeriodDeals[formattedDate] = (previousPeriodDeals[formattedDate] || 0) + Number(deal.value);
-      }
+    // Get current period deals
+    const currentPeriodDeals = await db.query.deals.findMany({
+      where: and(
+        eq(deals.stageId, closedWonStage.id),
+        gte(deals.createdAt, startOfDay(startDate)),
+        lte(deals.createdAt, endOfDay(now))
+      )
+    });
+    
+    // Get previous period deals
+    const previousPeriodDeals = await db.query.deals.findMany({
+      where: and(
+        eq(deals.stageId, closedWonStage.id),
+        gte(deals.createdAt, startOfDay(previousStartDate)),
+        lte(deals.createdAt, endOfDay(startDate))
+      )
+    });
+    
+    // Aggregate values by date
+    const currentPeriodData: Record<string, number> = {};
+    const previousPeriodData: Record<string, number> = {};
+    
+    currentPeriodDeals.forEach(deal => {
+      const date = deal.createdAt.toISOString().split('T')[0];
+      currentPeriodData[date] = (currentPeriodData[date] || 0) + Number(deal.value);
+    });
+    
+    previousPeriodDeals.forEach(deal => {
+      const date = deal.createdAt.toISOString().split('T')[0];
+      previousPeriodData[date] = (previousPeriodData[date] || 0) + Number(deal.value);
     });
     
     // Format for chart
-    const salesData = Object.keys({ ...currentPeriodDeals, ...previousPeriodDeals })
-      .sort((a, b) => {
-        // Sort dates properly
-        const dateA = new Date(a);
-        const dateB = new Date(b);
-        return dateA.getTime() - dateB.getTime();
-      })
+    const salesData = Object.keys({ ...currentPeriodData, ...previousPeriodData })
+      .sort()
       .map(date => ({
         name: date,
-        current: currentPeriodDeals[date] || 0,
-        previous: previousPeriodDeals[date] || 0
+        current: currentPeriodData[date] || 0,
+        previous: previousPeriodData[date] || 0
       }));
     
-    res.status(200).json({ salesData });
+    // Calculate summary metrics
+    const currentTotal = currentPeriodDeals.reduce((sum, deal) => sum + Number(deal.value), 0);
+    const previousTotal = previousPeriodDeals.reduce((sum, deal) => sum + Number(deal.value), 0);
+    const percentChange = previousTotal ? ((currentTotal - previousTotal) / previousTotal) * 100 : 0;
+    
+    res.status(200).json({
+      salesData,
+      summary: {
+        currentTotal,
+        previousTotal,
+        percentChange
+      }
+    });
   } catch (error) {
     console.error('Error fetching sales performance:', error);
     res.status(500).json({ error: 'Failed to fetch sales performance' });

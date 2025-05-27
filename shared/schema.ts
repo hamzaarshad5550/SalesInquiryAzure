@@ -2,6 +2,7 @@ import { pgTable, text, serial, integer, boolean, timestamp, decimal, jsonb } fr
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 
 // User schema
 export const users = pgTable("users", {
@@ -9,6 +10,7 @@ export const users = pgTable("users", {
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   name: text("name").notNull(),
+  full_name: text("full_name").notNull(),
   email: text("email").notNull().unique(),
   avatarUrl: text("avatar_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -52,6 +54,7 @@ export const contacts = pgTable("contacts", {
   phone: text("phone"),
   title: text("title"),
   company: text("company"),
+  source: text("source").default("other").notNull(),
   status: text("status").default("lead").notNull(), // lead, customer, partner, inactive
   avatarUrl: text("avatar_url"),
   address: text("address"),
@@ -149,6 +152,57 @@ export const activities = pgTable("activities", {
 });
 
 export const insertActivitySchema = createInsertSchema(activities);
+
+// Sales Performance Function
+export const getSalesPerformanceData = sql`
+  CREATE OR REPLACE FUNCTION public.get_sales_performance_data(p_period text)
+  RETURNS jsonb
+  LANGUAGE plpgsql
+  AS $$
+  DECLARE
+    v_start_date timestamp;
+    v_end_date timestamp;
+    v_result jsonb;
+  BEGIN
+    -- Set date range based on period
+    CASE p_period
+      WHEN 'week' THEN
+        v_start_date := date_trunc('week', current_date);
+        v_end_date := date_trunc('week', current_date) + interval '1 week' - interval '1 day';
+      WHEN 'month' THEN
+        v_start_date := date_trunc('month', current_date);
+        v_end_date := date_trunc('month', current_date) + interval '1 month' - interval '1 day';
+      WHEN 'quarter' THEN
+        v_start_date := date_trunc('quarter', current_date);
+        v_end_date := date_trunc('quarter', current_date) + interval '3 months' - interval '1 day';
+      WHEN 'year' THEN
+        v_start_date := date_trunc('year', current_date);
+        v_end_date := date_trunc('year', current_date) + interval '1 year' - interval '1 day';
+      ELSE
+        RAISE EXCEPTION 'Invalid period. Must be one of: week, month, quarter, year';
+    END CASE;
+
+    -- Get sales performance data
+    SELECT jsonb_build_object(
+      'total_deals', COUNT(*),
+      'total_value', COALESCE(SUM(value), 0),
+      'won_deals', COUNT(*) FILTER (WHERE stage_id = (SELECT id FROM pipeline_stages WHERE name = 'Closed Won')),
+      'won_value', COALESCE(SUM(value) FILTER (WHERE stage_id = (SELECT id FROM pipeline_stages WHERE name = 'Closed Won')), 0),
+      'avg_deal_size', COALESCE(AVG(value), 0),
+      'conversion_rate', CASE 
+        WHEN COUNT(*) > 0 THEN 
+          ROUND((COUNT(*) FILTER (WHERE stage_id = (SELECT id FROM pipeline_stages WHERE name = 'Closed Won'))::float / COUNT(*)::float) * 100, 2)
+        ELSE 0
+      END
+    ) INTO v_result
+    FROM deals
+    WHERE created_at >= v_start_date
+    AND created_at <= v_end_date;
+
+    RETURN v_result;
+  END;
+  $$;
+`;
 
 // Define relations
 export const usersRelations = relations(users, ({ many }) => ({

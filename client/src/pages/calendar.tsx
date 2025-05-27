@@ -7,6 +7,8 @@ import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppointmentForm } from "@/components/AppointmentForm";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+import React from "react";
 
 interface CalendarEvent {
   id: string;
@@ -175,28 +177,34 @@ export default function CalendarPage() {
   
   if (!currentUser) {
     return (
-      <div className="p-8 text-center">
-        <h1 className="text-2xl font-bold mb-4">Please sign in to view your calendar</h1>
-        <p>You need to be signed in to access your Google Calendar events.</p>
+      <div className="h-screen flex items-center justify-center p-8 text-center">
+        <div>
+          <h1 className="text-2xl font-bold mb-4">Please sign in to view your calendar</h1>
+          <p>You need to be signed in to access your Google Calendar events.</p>
+        </div>
       </div>
     );
   }
   
   return (
-    <div className="container mx-auto py-8 px-4">
-      <div className="mb-8 flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">Calendar</h1>
-          <p className="text-gray-500 dark:text-gray-400">View your Google Calendar events</p>
+    <div className="h-screen flex flex-col">
+      <div className="flex-none p-4 border-b">
+        <div className="container mx-auto">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">Calendar</h1>
+              <p className="text-gray-500 dark:text-gray-400">View your Google Calendar events</p>
+            </div>
+            
+            <Button 
+              onClick={() => setIsAppointmentFormOpen(true)}
+              className="flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Add Appointment
+            </Button>
+          </div>
         </div>
-        
-        <Button 
-          onClick={() => setIsAppointmentFormOpen(true)}
-          className="flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Add Appointment
-        </Button>
       </div>
       
       {/* Appointment form dialog */}
@@ -225,138 +233,106 @@ export default function CalendarPage() {
         }}
       />
       
-      <Card id="calendarView" className="w-full shadow-md">
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle>{formatMonth(currentDate)}</CardTitle>
-          <div className="flex items-center space-x-2">
-            <Button variant="outline" size="icon" onClick={prevMonth}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="icon" onClick={nextMonth}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="space-y-4">
-              <div className="grid grid-cols-7 gap-2 mb-4">
-                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-                  <div key={day} className="text-center font-medium text-sm py-2">
-                    {day}
-                  </div>
-                ))}
+      <div className="flex-1 overflow-y-auto">
+        <div className="container mx-auto p-4">
+          <Card id="calendarView" className="w-full shadow-md">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle>{formatMonth(currentDate)}</CardTitle>
+              <div className="flex items-center space-x-2">
+                <Button variant="outline" size="icon" onClick={prevMonth}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="icon" onClick={nextMonth}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
               </div>
-              {Array(6)
-                .fill(0)
-                .map((_, weekIndex) => (
-                  <div key={weekIndex} className="grid grid-cols-7 gap-2">
-                    {Array(7)
-                      .fill(0)
-                      .map((_, dayIndex) => (
-                        <Skeleton 
-                          key={dayIndex} 
-                          className="h-24 rounded-md"
-                        />
-                      ))}
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-7 gap-2 mb-4">
+                    {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+                      <div key={day} className="text-center font-medium text-sm py-2">
+                        {day}
+                      </div>
+                    ))}
                   </div>
-                ))}
-            </div>
-          ) : error ? (
-            <div className="p-4 bg-red-50 text-red-700 rounded-md dark:bg-red-900/30 dark:text-red-400">
-              <p className="font-medium mb-2">Error loading calendar events</p>
-              <p className="text-sm mb-3">{error}</p>
-              
-              {error && (error.includes("Permission denied") || error.includes("API not initialized")) && (
-                <div className="bg-amber-50 border border-amber-200 p-3 rounded-md text-amber-800 dark:bg-amber-900/30 dark:border-amber-800 dark:text-amber-300 mt-4 text-sm">
-                  <p className="font-medium mb-2">API Services Need to be Enabled</p>
-                  <ol className="list-decimal pl-5 space-y-2">
-                    <li>Go to the <a href="https://console.developers.google.com/apis/dashboard" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 underline">Google Cloud Console</a></li>
-                    <li>Select your project (ID: 88311205730)</li>
-                    <li>Click on "Enable APIs and Services"</li>
-                    <li>Search for and enable each of these APIs:
-                      <ul className="list-disc pl-5 mt-1">
-                        <li>Gmail API</li>
-                        <li>Google Calendar API</li>
-                        <li>People API</li>
-                      </ul>
-                    </li>
-                    <li>After enabling the APIs, wait a few minutes and try again</li>
-                  </ol>
+                  {Array(6).fill(0).map((_, weekIndex) => (
+                    <div key={weekIndex} className="grid grid-cols-7 gap-2">
+                      {Array(7).fill(0).map((_, dayIndex) => (
+                        <div key={dayIndex} className="aspect-square">
+                          <Skeleton className="w-full h-full" />
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              ) : error ? (
+                <div className="text-center py-8">
+                  <p className="text-red-500">{error}</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-7 gap-2 mb-4">
+                    {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+                      <div key={day} className="text-center font-medium text-sm py-2">
+                        {day}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-7 gap-2">
+                    {calendar.map((week, weekIndex) => (
+                      <React.Fragment key={weekIndex}>
+                        {week.map((date, dayIndex) => {
+                          const dayEvents = date ? getEventsForDay(date) : [];
+                          const isToday = date && date.toDateString() === new Date().toDateString();
+                          
+                          return (
+                            <div
+                              key={dayIndex}
+                              className={cn(
+                                "aspect-square p-2 border rounded-lg",
+                                !date && "bg-gray-50 dark:bg-gray-800",
+                                isToday && "border-primary"
+                              )}
+                            >
+                              {date && (
+                                <>
+                                  <div className="text-sm font-medium mb-1">
+                                    {date.getDate()}
+                                  </div>
+                                  <div className="space-y-1">
+                                    {dayEvents.map((event) => (
+                                      <div
+                                        key={event.id}
+                                        className="text-xs p-1 bg-primary/10 rounded truncate"
+                                        title={event.summary}
+                                      >
+                                        <div className="font-medium truncate">
+                                          {event.summary}
+                                        </div>
+                                        {event.start.dateTime && (
+                                          <div className="text-gray-500 dark:text-gray-400">
+                                            {formatTime(event.start.dateTime)}
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </React.Fragment>
+                    ))}
+                  </div>
                 </div>
               )}
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-7 gap-2 mb-4">
-                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-                  <div key={day} className="text-center font-medium text-sm py-2">
-                    {day}
-                  </div>
-                ))}
-              </div>
-              
-              <div className="space-y-2">
-                {calendar.map((week, weekIndex) => (
-                  <div key={weekIndex} className="grid grid-cols-7 gap-2">
-                    {week.map((day, dayIndex) => {
-                      const isToday = day && 
-                        day.getDate() === new Date().getDate() &&
-                        day.getMonth() === new Date().getMonth() &&
-                        day.getFullYear() === new Date().getFullYear();
-                      
-                      const dayEvents = day ? getEventsForDay(day) : [];
-                      
-                      return (
-                        <div 
-                          key={dayIndex} 
-                          className={`min-h-[100px] p-2 border rounded-md ${
-                            !day ? 'bg-gray-50 dark:bg-gray-800/50 text-gray-400 dark:text-gray-600' : 
-                            isToday ? 'border-primary bg-primary/5' : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'
-                          }`}
-                        >
-                          {day && (
-                            <>
-                              <div className={`text-sm ${isToday ? 'font-bold text-primary' : ''}`}>
-                                {day.getDate()}
-                              </div>
-                              <div className="mt-1 space-y-1">
-                                {dayEvents.length > 0 ? (
-                                  dayEvents.slice(0, 3).map((event) => (
-                                    <div 
-                                      key={event.id} 
-                                      className="text-xs p-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded truncate"
-                                      title={event.summary}
-                                    >
-                                      {event.start.dateTime && (
-                                        <span className="font-medium mr-1">
-                                          {formatTime(event.start.dateTime)}
-                                        </span>
-                                      )}
-                                      {event.summary}
-                                    </div>
-                                  ))
-                                ) : (
-                                  <div className="text-xs text-gray-400 italic">No events</div>
-                                )}
-                                {dayEvents.length > 3 && (
-                                  <div className="text-xs text-gray-500">
-                                    +{dayEvents.length - 3} more
-                                  </div>
-                                )}
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }

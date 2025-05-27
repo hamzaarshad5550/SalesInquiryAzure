@@ -33,7 +33,7 @@ export function TopBar({ onMenuClick }: TopBarProps) {
           </button>
 
           <div className="flex items-center flex-1 ml-3">
-            <div className="relative w-full max-w-xl">
+            <div className="hidden relative w-full max-w-xl">
               <div className="flex items-center">
                 <div className="mr-3 text-slate-400 text-sm hidden md:block">Quick Actions:</div>
                 <Button

@@ -972,17 +972,34 @@ export const storage = {
    */
   async updateContact(contactId: number, contactData: Partial<InsertContact>) {
     try {
+      // Convert from camelCase to snake_case for Supabase
+      const supabaseContactData = {
+        name: contactData.name,
+        email: contactData.email,
+        phone: contactData.phone,
+        title: contactData.title,
+        company: contactData.company,
+        status: contactData.status,
+        assigned_to: contactData.assignedTo, // Convert from assignedTo to assigned_to
+        avatar_url: contactData.avatarUrl,   // Convert from avatarUrl to avatar_url
+        address: contactData.address,
+        notes: contactData.notes,
+        updated_at: new Date().toISOString()
+      };
+
+      console.log("Sending to Supabase:", supabaseContactData);
+      
       const { data: contact, error } = await supabase
         .from('contacts')
-        .update({
-          ...contactData,
-          updated_at: new Date().toISOString()
-        })
+        .update(supabaseContactData)
         .eq('id', contactId)
         .select()
         .single();
       
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase update error:", error);
+        throw error;
+      }
       
       return contact;
     } catch (error) {

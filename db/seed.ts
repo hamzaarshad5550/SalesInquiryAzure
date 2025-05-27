@@ -12,6 +12,7 @@ async function seed() {
         username: "sarah.johnson",
         password: "$2b$10$dJkqZ8NJDe.lIzhvbR.lKuF9g/UOxHWweaEMYgVLe/AqzYlGcVBXe", // hashed password
         name: "Sarah Johnson",
+        full_name: "Sarah Johnson",
         email: "sarah.j@company.com",
         avatarUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
       },
@@ -19,6 +20,7 @@ async function seed() {
         username: "david.kim",
         password: "$2b$10$dJkqZ8NJDe.lIzhvbR.lKuF9g/UOxHWweaEMYgVLe/AqzYlGcVBXe",
         name: "David Kim",
+        full_name: "David Kim",
         email: "david.k@company.com",
         avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
       },
@@ -26,6 +28,7 @@ async function seed() {
         username: "michael.rodriguez",
         password: "$2b$10$dJkqZ8NJDe.lIzhvbR.lKuF9g/UOxHWweaEMYgVLe/AqzYlGcVBXe",
         name: "Michael Rodriguez",
+        full_name: "Michael Rodriguez",
         email: "michael.r@company.com",
         avatarUrl: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
       },
@@ -33,6 +36,7 @@ async function seed() {
         username: "emily.chen",
         password: "$2b$10$dJkqZ8NJDe.lIzhvbR.lKuF9g/UOxHWweaEMYgVLe/AqzYlGcVBXe",
         name: "Emily Chen",
+        full_name: "Emily Chen",
         email: "emily.c@company.com",
         avatarUrl: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
       }
@@ -131,6 +135,7 @@ async function seed() {
         phone: "+1 (555) 123-4567",
         title: "Technology Director",
         company: "TechVision Corp",
+        source: "website",
         status: "active",
         avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80",
         assignedTo: 1
@@ -141,6 +146,7 @@ async function seed() {
         phone: "+1 (555) 234-5678",
         title: "Marketing Director",
         company: "InnoSolutions",
+        source: "referral",
         status: "active",
         avatarUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80",
         assignedTo: 2
@@ -151,6 +157,7 @@ async function seed() {
         phone: "+1 (555) 345-6789",
         title: "CEO",
         company: "Acme Inc.",
+        source: "linkedin",
         status: "lead",
         avatarUrl: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80",
         assignedTo: 3
@@ -161,6 +168,7 @@ async function seed() {
         phone: "+1 (555) 456-7890",
         title: "CTO",
         company: "NextGen Retail",
+        source: "event",
         status: "customer",
         avatarUrl: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80",
         assignedTo: 1
@@ -171,6 +179,7 @@ async function seed() {
         phone: "+1 (555) 567-8901",
         title: "Procurement Manager",
         company: "GlobalMart",
+        source: "website",
         status: "active",
         avatarUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80",
         assignedTo: 2
@@ -181,6 +190,7 @@ async function seed() {
         phone: "+1 (555) 678-9012",
         title: "IT Manager",
         company: "TechCorp",
+        source: "referral",
         status: "lead",
         avatarUrl: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80",
         assignedTo: 3

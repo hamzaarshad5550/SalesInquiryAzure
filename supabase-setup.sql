@@ -11,21 +11,22 @@ CREATE TABLE IF NOT EXISTS pipeline_stages (
 -- Drop the existing deals table if it exists
 DROP TABLE IF EXISTS deals;
 
--- Create deals table with proper foreign key reference
+-- Create deals table with proper foreign key references
 CREATE TABLE IF NOT EXISTS deals (
   id SERIAL PRIMARY KEY,
-  title TEXT NOT NULL,
+  name TEXT NOT NULL,
   description TEXT,
   value DECIMAL(15, 2) NOT NULL DEFAULT 0,
-  currency TEXT NOT NULL DEFAULT 'USD',
-  stage INTEGER NOT NULL,
-  confidence INTEGER DEFAULT 50,
-  owner_id INTEGER NOT NULL,
+  stage_id INTEGER NOT NULL,
   contact_id INTEGER NOT NULL,
+  owner_id INTEGER NOT NULL,
+  probability INTEGER DEFAULT 50,
   expected_close_date TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  CONSTRAINT fk_stage FOREIGN KEY (stage) REFERENCES pipeline_stages(id)
+  CONSTRAINT fk_stage FOREIGN KEY (stage_id) REFERENCES pipeline_stages(id),
+  CONSTRAINT fk_contact FOREIGN KEY (contact_id) REFERENCES contacts(id),
+  CONSTRAINT fk_owner FOREIGN KEY (owner_id) REFERENCES users(id)
 );
 
 -- Insert default pipeline stages if they don't exist

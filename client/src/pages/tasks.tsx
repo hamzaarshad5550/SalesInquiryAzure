@@ -126,8 +126,8 @@ export default function Tasks() {
         time: data.time || undefined,
         relatedToType: data.relatedToType || undefined,
         relatedToId: data.relatedToId ? Number(data.relatedToId) : undefined,
-        // Ensure assignedTo is a number and use assigned_to instead
-        assigned_to: Number(data.assignedTo), // Use assigned_to instead of assignedTo
+        // Ensure assigned_to is set correctly
+        assigned_to: Number(data.assignedTo),
       };
       
       console.log("Sending task data:", formattedData);
@@ -156,12 +156,14 @@ export default function Tasks() {
         ...data,
         // Convert empty strings to undefined for optional fields
         description: data.description || undefined,
-        dueDate: data.dueDate || undefined, // Keep as string, server will handle conversion
+        dueDate: data.dueDate || undefined,
         time: data.time || undefined,
         relatedToType: data.relatedToType || undefined,
-        relatedToId: data.relatedToId || undefined,
-        // Ensure assignedTo is a number and use assigned_to instead
+        relatedToId: data.relatedToId ? Number(data.relatedToId) : undefined,
+        // Ensure assigned_to is set correctly
         assigned_to: data.assignedTo ? Number(data.assignedTo) : undefined,
+        // Remove assignedTo to avoid confusion
+        assignedTo: undefined,
       };
       
       console.log("Sending task update:", formattedData);

@@ -40,30 +40,13 @@ export default defineConfig({
       // Data Management
       "@tanstack/react-query",
       "@supabase/supabase-js",
-      
-      // Authentication
+    ],
+    exclude: [
+      // Exclude Firebase packages to prevent resolution issues
       "firebase",
       "firebase/auth",
-      "firebase/app",
-      "gapi-script",
-      
-      // Data Processing
-      "papaparse",
-      
-      // Form Handling
-      "@hookform/resolvers",
-      "@hookform/resolvers/zod",
-      "react-hook-form",
-      "zod",
-      
-      // Date Handling
-      "date-fns",
-      
-      // Utility
-      "class-variance-authority",
-      "clsx",
-      "tailwind-merge"
-    ],
+      "firebase/app"
+    ]
   },
   server: {
     port: 5173,
