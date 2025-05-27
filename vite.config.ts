@@ -9,15 +9,20 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      "@db": path.resolve(__dirname, "db"),
-      "@": path.resolve(__dirname, "client", "src"),
-      "@shared": path.resolve(__dirname, "shared"),
+      "@": path.resolve(__dirname, "./client/src"),
+      "@shared": path.resolve(__dirname, "./shared"),
+      "@db": path.resolve(__dirname, "./db"),
       "@assets": path.resolve(__dirname, "attached_assets"),
     },
   },
   root: path.resolve(__dirname, "client"),
   build: {
-    outDir: path.resolve(__dirname, "dist/public"),
+    outDir: "dist",
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, "client/src/main.tsx")
+      }
+    },
     emptyOutDir: true,
     sourcemap: false,
   },
@@ -45,11 +50,20 @@ export default defineConfig({
       // Exclude Firebase packages to prevent resolution issues
       "firebase",
       "firebase/auth",
-      "firebase/app"
+      "firebase/app",
+      "@babel/preset-typescript",
+      "lightningcss",
+      "esbuild"
     ]
   },
   server: {
-    port: 5173,
+    port: 3000,
+    proxy: {
+      "/api": {
+        target: "http://localhost:8080",
+        changeOrigin: true
+      }
+    },
     strictPort: true,
     host: true,
   }
