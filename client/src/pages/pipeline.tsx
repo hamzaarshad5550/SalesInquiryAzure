@@ -186,13 +186,14 @@ export default function PipelinePage() {
   // Create deal mutation
   const { mutate: createDealMutation, isPending } = useMutation({
     mutationFn: async (data: DealFormValues) => {
-      // Create a deal with the correct column names matching the database schema
+      // Create a deal directly in Supabase with the exact column names from the database
       const dealData = {
-        name: data.name,
+        title: data.name,
         description: data.description || null,
         value: Number(data.value) || 0,
-        stage_id: data.stageId,
-        probability: data.probability,
+        currency: "USD",
+        stage: data.stageId,
+        confidence: data.probability,
         owner_id: 1, // Default owner ID
         contact_id: 1, // Default contact ID
         expected_close_date: data.expectedCloseDate || null,
