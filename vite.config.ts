@@ -45,12 +45,13 @@ export default defineConfig({
       // Data Management
       "@tanstack/react-query",
       "@supabase/supabase-js",
+      
+      // Firebase
+      "firebase",
+      "firebase/app",
+      "firebase/auth"
     ],
     exclude: [
-      // Exclude Firebase packages to prevent resolution issues
-      "firebase",
-      "firebase/auth",
-      "firebase/app",
       "@babel/preset-typescript",
       "lightningcss",
       "esbuild"
