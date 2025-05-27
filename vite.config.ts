@@ -25,7 +25,8 @@ export default defineConfig({
       external: [
         'react-icons',
         'react-icons/si',
-        'gapi-script'
+        'gapi-script',
+        '@radix-ui/react-tabs'
       ]
     },
     emptyOutDir: true,
@@ -46,6 +47,7 @@ export default defineConfig({
       "react-icons",
       "react-icons/si",
       "recharts",
+      "@radix-ui/react-tabs",
       
       // Data Management
       "@tanstack/react-query",
