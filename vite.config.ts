@@ -21,7 +21,10 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, "client/src/main.tsx")
-      }
+      },
+      external: [
+        // Add any external dependencies here if needed
+      ]
     },
     emptyOutDir: true,
     sourcemap: false,
@@ -49,7 +52,10 @@ export default defineConfig({
       // Firebase
       "firebase",
       "firebase/app",
-      "firebase/auth"
+      "firebase/auth",
+
+      // CSV Parsing
+      "papaparse"
     ],
     exclude: [
       "@babel/preset-typescript",
