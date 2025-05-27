@@ -239,20 +239,17 @@ export const dealsRelations = relations(deals, ({ one, many }) => ({
 }));
 
 export const tasksRelations = relations(tasks, ({ one }) => ({
-  assignedUser: one(users, { fields: [tasks.assigned_to], references: [users.id], relationName: "assignedTasks" }), // Changed from tasks.assignedTo to tasks.assigned_to
+  assignedUser: one(users, { fields: [tasks.assigned_to], references: [users.id], relationName: "assignedTasks" }),
   deal: one(deals, {
     fields: [tasks.relatedToId],
     references: [deals.id],
-    relationName: "dealTasks",
-    // Only apply this relation when relatedToType is 'deal'
-    filterFn: (tasks, _deals) => tasks.relatedToType.equals('deal'),
+    relationName: "dealTasks"
   }),
   contact: one(contacts, {
     fields: [tasks.relatedToId],
     references: [contacts.id],
-    // Only apply this relation when relatedToType is 'contact'
-    filterFn: (tasks, _contacts) => tasks.relatedToType.equals('contact'),
-  }),
+    relationName: "contactTasks"
+  })
 }));
 
 export const activitiesRelations = relations(activities, ({ one }) => ({
@@ -260,15 +257,13 @@ export const activitiesRelations = relations(activities, ({ one }) => ({
   deal: one(deals, {
     fields: [activities.relatedToId],
     references: [deals.id],
-    // Only apply this relation when relatedToType is 'deal'
-    filterFn: (activities, _deals) => activities.relatedToType.equals('deal'),
+    relationName: "dealActivities"
   }),
   contact: one(contacts, {
     fields: [activities.relatedToId],
     references: [contacts.id],
-    // Only apply this relation when relatedToType is 'contact'
-    filterFn: (activities, _contacts) => activities.relatedToType.equals('contact'),
-  }),
+    relationName: "contactActivities"
+  })
 }));
 
 // Export types for use in application
