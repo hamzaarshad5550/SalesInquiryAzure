@@ -23,7 +23,8 @@ export default defineConfig({
         main: path.resolve(__dirname, "client/src/main.tsx")
       },
       external: [
-        // Add any external dependencies here if needed
+        'react-icons',
+        'react-icons/si'
       ]
     },
     emptyOutDir: true,
