@@ -1,37 +1,35 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { registerRoutes } from './public/server/routes.js';
+import { registerRoutes } from './server/routes.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// Log startup information
-console.log('Starting server in environment:', process.env.NODE_ENV);
-console.log('Server directory:', __dirname);
+// Log the current working directory and file paths
 console.log('Current working directory:', process.cwd());
+console.log('Server file location:', __dirname);
 
-// Parse JSON bodies
+// Middleware
 app.use(express.json());
-
-// Register API routes
-await registerRoutes(app);
-
-// Serve static files from the dist directory
+app.use(express.static(path.join(__dirname, 'dist')));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Serve index.html for all routes (SPA fallback)
+// Register API routes
+try {
+  await registerRoutes(app);
+  console.log('Routes registered successfully');
+} catch (error) {
+  console.error('Error registering routes:', error);
+}
+
+// Serve index.html for all other routes
 app.get('*', (req, res) => {
-  const indexPath = path.join(__dirname, 'public', 'index.html');
-  console.log('Attempting to serve index.html from:', indexPath);
-  
-  res.sendFile(indexPath, (err) => {
-    if (err) {
-      console.error('Error serving index.html:', err);
-      res.status(500).send('Error loading the application');
-    }
-  });
+  console.log('Serving index.html for path:', req.path);
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Error handling middleware
@@ -41,5 +39,6 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Server is running on port ${PORT}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
