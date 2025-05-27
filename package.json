@@ -9,7 +9,7 @@
     "start": "node server.js",
     "build": "npm run build:client && npm run build:server",
     "build:client": "vite build",
-    "build:server": "tsc -p tsconfig.server.json",
+    "build:server": "esbuild server/index.ts --bundle --platform=node --target=node20 --outfile=dist/index.js",
     "postbuild": "mkdir -p public && cp -r dist/* public/",
     "dev": "tsx server/index.ts"
   },
