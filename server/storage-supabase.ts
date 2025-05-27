@@ -13,8 +13,7 @@ interface Deal {
   name: string;
   value: number;
   description?: string;
-  stage?: number; // Make optional since it might not exist
-  stage?: number;    // Add this as an alternative
+  stage: number; // Make optional since it might not exist
   expected_close_date?: string;
   contact_id: number;
   owner_id: number;
@@ -1425,6 +1424,25 @@ export const storage = {
           order: 5
         }
       ];
+    }
+  },
+
+  /**
+   * Deletes a task
+   */
+  async deleteTask(taskId: number) {
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .delete()
+        .eq('id', taskId);
+      
+      if (error) throw error;
+      
+      return true;
+    } catch (error) {
+      handleError(error, 'deleteTask');
+      return false;
     }
   }
 };

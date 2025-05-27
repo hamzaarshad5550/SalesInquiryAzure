@@ -6,6 +6,7 @@ import {
 } from "@shared/schema";
 import { format, formatISO, subMonths, startOfMonth, endOfMonth, subYears, startOfDay, endOfDay } from "date-fns";
 import { supabase } from "./supabase";
+import { isSuccessResponse, isErrorResponse } from './types/supabase';
 
 // Create a fallback database implementation using Supabase REST API
 // This avoids the direct PostgreSQL connection that's having DNS resolution issues
@@ -22,14 +23,16 @@ export const storage = {
    */
   async getCurrentUser() {
     try {
-      const { data, error } = await supabase
+      const response = await supabase
         .from('users')
-        .select('*')
-        .eq('id', 1) // Default to first user for demo
-        .single();
+        .select('id')
+        .eq('id', 1);
       
-      if (error) throw error;
-      return data;
+      if (isErrorResponse(response)) throw response.error;
+      if (!isSuccessResponse(response)) return false;
+      
+      const data = response.data as { id: number }[];
+      return data.length > 0;
     } catch (error) {
       handleError(error, 'getCurrentUser');
     }
@@ -46,7 +49,9 @@ export const storage = {
         .order('name', { ascending: true });
       
       if (error) throw error;
-      return data || [];
+      if (!data) return [];
+      
+      return data;
     } catch (error) {
       handleError(error, 'getAllTeams');
       return [];
@@ -58,13 +63,18 @@ export const storage = {
    */
   async getAllUsers() {
     try {
-      const { data, error } = await supabase
+      const response = await supabase
         .from('users')
-        .select('*')
-        .order('name', { ascending: true });
+        .select('*');
       
-      if (error) throw error;
-      return data || [];
+      if (isErrorResponse(response)) throw response.error;
+      if (!isSuccessResponse(response)) return [];
+      
+      const data = response.data as { id: number; name?: string }[];
+      return data.map(user => ({
+        id: user.id,
+        name: user.name || `User ${user.id}`
+      }));
     } catch (error) {
       handleError(error, 'getAllUsers');
       return [];

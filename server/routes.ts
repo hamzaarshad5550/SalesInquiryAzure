@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 // Import storage from the Supabase implementation instead
 import { storage } from "./storage-supabase";
+import { supabase } from "./supabase";
 import { formatISO, subMonths, startOfMonth, endOfMonth, subYears } from "date-fns";
 import {
   insertContactSchema,
@@ -412,6 +413,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         owner_id: dealData.ownerId,
         probability: dealData.probability,
         expected_close_date: dealData.expectedCloseDate,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
       
       console.log("Transformed deal data for Supabase:", transformedData);
@@ -444,6 +447,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         owner_id: dealData.ownerId,
         probability: dealData.probability,
         expected_close_date: dealData.expectedCloseDate,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
       
       console.log("Transformed deal data for Supabase:", transformedData);
