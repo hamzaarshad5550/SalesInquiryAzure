@@ -24,7 +24,8 @@ export default defineConfig({
       },
       external: [
         'react-icons',
-        'react-icons/si'
+        'react-icons/si',
+        'gapi-script'
       ]
     },
     emptyOutDir: true,
@@ -56,7 +57,10 @@ export default defineConfig({
       "firebase/auth",
 
       // CSV Parsing
-      "papaparse"
+      "papaparse",
+
+      // Google API
+      "gapi-script"
     ],
     exclude: [
       "@babel/preset-typescript",
