@@ -7,11 +7,10 @@
   },
   "scripts": {
     "start": "node server.js",
-    "build": "npm run build:client && npm run build:server && npm run copy-server",
+    "build": "npm run build:client && npm run build:server",
     "build:client": "vite build",
-    "build:server": "esbuild server/index.ts --bundle --platform=node --target=node20 --format=esm --outfile=dist/index.js --external:@babel/preset-typescript --external:lightningcss --external:esbuild",
-    "copy-server": "cp -r server dist/ && cp -r shared dist/ && cp -r db dist/",
-    "postbuild": "mkdir -p public && cp -r dist/* public/",
+    "build:server": "tsc -p tsconfig.server.json && esbuild dist/server/index.js --bundle --platform=node --target=node20 --format=esm --outfile=dist/server.js --external:@babel/preset-typescript --external:lightningcss --external:esbuild",
+    "postbuild": "mkdir -p public && cp -r dist/* public/ && cp -r server public/ && cp -r shared public/ && cp -r db public/",
     "dev": "tsx server/index.ts"
   },
   "dependencies": {

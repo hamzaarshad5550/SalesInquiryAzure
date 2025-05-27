@@ -1,7 +1,7 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { registerRoutes } from './dist/server/routes.js';
+import { registerRoutes } from './public/server/routes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -19,9 +19,6 @@ app.use(express.json());
 await registerRoutes(app);
 
 // Serve static files from the dist directory
-app.use(express.static(path.join(__dirname, 'dist')));
-
-// Serve static files from the public directory
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Serve index.html for all routes (SPA fallback)
