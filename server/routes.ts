@@ -419,7 +419,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log("Transformed deal data for Supabase:", transformedData);
       
-      const newDeal = await storage.createDeal(transformedData);
+      // Transform back to camelCase for the storage layer
+      const storageData = {
+        name: transformedData.name,
+        value: transformedData.value,
+        stageId: transformedData.stage_id,
+        contactId: transformedData.contact_id,
+        ownerId: transformedData.owner_id,
+        description: transformedData.description,
+        expectedCloseDate: transformedData.expected_close_date,
+        probability: transformedData.probability,
+        createdAt: transformedData.created_at,
+        updatedAt: transformedData.updated_at
+      };
+      
+      const newDeal = await storage.createDeal(storageData);
       res.status(201).json(newDeal);
     } catch (error) {
       if (error instanceof ZodError) {
@@ -453,7 +467,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log("Transformed deal data for Supabase:", transformedData);
       
-      const newDeal = await storage.createDeal(transformedData);
+      // Transform back to camelCase for the storage layer
+      const storageData = {
+        name: transformedData.name,
+        value: transformedData.value,
+        stageId: transformedData.stage_id,
+        contactId: transformedData.contact_id,
+        ownerId: transformedData.owner_id,
+        description: transformedData.description,
+        expectedCloseDate: transformedData.expected_close_date,
+        probability: transformedData.probability,
+        createdAt: transformedData.created_at,
+        updatedAt: transformedData.updated_at
+      };
+      
+      const newDeal = await storage.createDeal(storageData);
       res.status(201).json(newDeal);
     } catch (error) {
       if (error instanceof ZodError) {

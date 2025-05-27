@@ -1058,7 +1058,7 @@ export const storage = {
       const { data: deal, error } = await supabase
         .from('deals')
         .update({
-          stage: stage,
+          stage: stageId,
           updated_at: new Date().toISOString()
         })
         .eq('id', dealId)

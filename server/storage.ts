@@ -23,16 +23,15 @@ export const storage = {
    */
   async getCurrentUser() {
     try {
-      const response = await supabase
+      const { data, error } = await supabase
         .from('users')
         .select('id')
         .eq('id', 1);
       
-      if (isErrorResponse(response)) throw response.error;
-      if (!isSuccessResponse(response)) return false;
+      if (error) throw error;
+      if (!data) return false;
       
-      const data = response.data as { id: number }[];
-      return data.length > 0;
+      return Array.isArray(data) && data.length > 0;
     } catch (error) {
       handleError(error, 'getCurrentUser');
     }
@@ -63,18 +62,17 @@ export const storage = {
    */
   async getAllUsers() {
     try {
-      const response = await supabase
+      const { data, error } = await supabase
         .from('users')
         .select('*');
       
-      if (isErrorResponse(response)) throw response.error;
-      if (!isSuccessResponse(response)) return [];
+      if (error) throw error;
+      if (!data) return [];
       
-      const data = response.data as { id: number; name?: string }[];
-      return data.map(user => ({
+      return Array.isArray(data) ? data.map(user => ({
         id: user.id,
         name: user.name || `User ${user.id}`
-      }));
+      })) : [];
     } catch (error) {
       handleError(error, 'getAllUsers');
       return [];
