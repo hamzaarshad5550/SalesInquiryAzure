@@ -4,7 +4,9 @@
     "module": "ESNext",
     "outDir": "dist",
     "noEmit": false,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "allowImportingTsExtensions": false,
+    "moduleResolution": "node"
   },
   "include": ["server/**/*", "shared/**/*"],
   "exclude": ["client/**/*", "node_modules"]
