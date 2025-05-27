@@ -6,9 +6,11 @@
     "node": ">=20.0.0"
   },
   "scripts": {
-    "start": "node dist/index.js",
-    "build": "node no-tailwind-build.mjs",
-    "build:original": "node direct-build.mjs",
+    "start": "node server.js",
+    "build": "npm run build:client && npm run build:server",
+    "build:client": "vite build",
+    "build:server": "tsc -p tsconfig.server.json",
+    "postbuild": "mkdir -p public && cp -r dist/* public/",
     "dev": "tsx server/index.ts"
   },
   "dependencies": {
