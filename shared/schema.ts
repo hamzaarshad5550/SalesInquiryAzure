@@ -104,7 +104,7 @@ export const tasks = pgTable("tasks", {
   time: text("time"), // e.g. "9:00 AM - 10:00 AM"
   completed: boolean("completed").default(false).notNull(),
   priority: text("priority").default("medium").notNull(), // high, medium, low
-  assigned_to: integer("assigned_to").references(() => users.id).notNull(), // Changed from assignedTo to assigned_to
+  assigned_to: integer("assigned_to").references(() => users.id).notNull(),
   relatedToType: text("related_to_type"), // deal, contact
   relatedToId: integer("related_to_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -268,25 +268,25 @@ export const activitiesRelations = relations(activities, ({ one }) => ({
 
 // Export types for use in application
 export type User = typeof users.$inferSelect;
-export type InsertUser = z.infer<typeof insertUserSchema>;
+export type InsertUser = typeof users.$inferInsert;
 
 export type Team = typeof teams.$inferSelect;
-export type InsertTeam = z.infer<typeof insertTeamSchema>;
+export type InsertTeam = typeof teams.$inferInsert;
 
 export type UserTeam = typeof userTeams.$inferSelect;
-export type InsertUserTeam = z.infer<typeof insertUserTeamSchema>;
+export type InsertUserTeam = typeof userTeams.$inferInsert;
 
 export type Contact = typeof contacts.$inferSelect;
-export type InsertContact = z.infer<typeof insertContactSchema>;
+export type InsertContact = typeof contacts.$inferInsert;
 
 export type PipelineStage = typeof pipelineStages.$inferSelect;
-export type InsertPipelineStage = z.infer<typeof insertPipelineStageSchema>;
+export type InsertPipelineStage = typeof pipelineStages.$inferInsert;
 
 export type Deal = typeof deals.$inferSelect;
-export type InsertDeal = z.infer<typeof insertDealSchema>;
+export type InsertDeal = typeof deals.$inferInsert;
 
 export type Task = typeof tasks.$inferSelect;
-export type InsertTask = z.infer<typeof insertTaskSchema>;
+export type InsertTask = typeof tasks.$inferInsert;
 
 export type Activity = typeof activities.$inferSelect;
-export type InsertActivity = z.infer<typeof insertActivitySchema>;
+export type InsertActivity = typeof activities.$inferInsert;

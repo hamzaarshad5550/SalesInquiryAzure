@@ -1,12 +1,19 @@
+import { supabase } from './supabase';
 import { 
-  type InsertContact,
+  type Deal,
+  type PipelineStage,
+  type Contact,
+  type User,
+  type Task,
+  type Activity,
   type InsertDeal,
+  type InsertContact,
   type InsertTask,
   type InsertActivity
-} from "@shared/schema";
+} from '../shared/schema';
 import { format, formatISO, subMonths, startOfMonth, endOfMonth, subYears, startOfDay, endOfDay } from "date-fns";
-import { supabase } from "./supabase";
-import { isSuccessResponse, isErrorResponse } from './types/supabase';
+import { isSuccessResponse, isErrorResponse, isArrayResponse, getResponseData } from './types/supabase';
+import { handleError as logError } from './utils';
 
 // Create a fallback database implementation using Supabase REST API
 // This avoids the direct PostgreSQL connection that's having DNS resolution issues
@@ -17,23 +24,36 @@ const handleError = (error: any, operation: string) => {
   throw new Error(`Failed to execute ${operation}`);
 };
 
+// Type for deal response from Supabase
+interface DealResponse {
+  id: number;
+  name: string;
+  value: number;
+  description?: string;
+  updated_at: string;
+  owner_id: number;
+  owner_name?: string;
+  owner_avatar_url?: string;
+}
+
 export const storage = {
   /**
    * Gets the current authenticated user (placeholder for auth)
    */
   async getCurrentUser() {
     try {
-      const { data, error } = await supabase
+      const response = await supabase
         .from('users')
         .select('id')
         .eq('id', 1);
       
-      if (error) throw error;
+      const data = getResponseData(response) as { id: number }[] | null;
       if (!data) return false;
       
-      return Array.isArray(data) && data.length > 0;
+      return data.length > 0;
     } catch (error) {
-      handleError(error, 'getCurrentUser');
+      logError(error, 'getCurrentUser');
+      return false;
     }
   },
 
@@ -187,8 +207,10 @@ export const storage = {
       .lte('updated_at', previousMonthEnd.toISOString())
       .eq('stage_id', 5); // Closed Won
     
-    const prevTotalClosed = prevClosedDeals?.length || 0;
-    const prevTotalClosedWon = prevClosedWonDeals?.length || 0;
+    const prevClosedDealsData = getResponseData(prevClosedDeals);
+    const prevClosedWonDealsData = getResponseData(prevClosedWonDeals);
+    const prevTotalClosed = Array.isArray(prevClosedDealsData) ? prevClosedDealsData.length : 0;
+    const prevTotalClosedWon = Array.isArray(prevClosedWonDealsData) ? prevClosedWonDealsData.length : 0;
     
     const conversionRate = totalClosed === 0 
       ? 0 
@@ -297,131 +319,8 @@ export const storage = {
           value: totalQuarterRevenue
         });
       }
-    } else if (period === 'yearly') {
-      // Get last 5 years
-      for (let i = 4; i >= 0; i--) {
-        const yearDate = subYears(now, i);
-        const yearStart = new Date(yearDate.getFullYear(), 0, 1);
-        const yearEnd = new Date(yearDate.getFullYear(), 11, 31);
-        
-        const { data: yearRevenue, error: yearRevenueError } = await supabase
-          .from('deals')
-          .select('value')
-          .eq('stage_id', 5) // Closed Won
-          .gte('updated_at', yearStart.toISOString())
-          .lte('updated_at', yearEnd.toISOString());
-          
-        if (yearRevenueError) throw yearRevenueError;
-        
-        const totalYearRevenue = yearRevenue?.reduce((sum: number, deal: { value: string | number }) => sum + Number(deal.value), 0) || 0;
-        
-        salesData.push({
-          name: format(yearDate, 'yyyy'),
-          value: totalYearRevenue
-        });
-      }
     }
     
     return salesData;
-  },
-
-  /**
-   * Gets pipeline overview data for dashboard
-   */
-  async getPipelineOverview() {
-    const { data: pipelineData, error } = await supabase
-      .from('pipelineStages')
-      .select('*')
-      .order('order', { ascending: true });
-      
-    if (error) throw error;
-    
-    // Calculate total value for each stage
-    const stagesWithTotals = await Promise.all(
-      pipelineData.map(async (stage: { id: number; name: string; color: string; order: number }) => {
-        const stageDeals = await supabase
-          .from('deals')
-          .select('value')
-          .eq('stage_id', stage.id)
-          .order('updated_at', { ascending: false })
-          .limit(5)
-          .single();
-        
-        return {
-          id: stage.id,
-          name: stage.name,
-          color: stage.color,
-          order: stage.order,
-          totalValue: Number(stageDeals[0]?.value) || 0,
-          deals: stageDeals.map((deal: any) => ({
-            id: String(deal.id),
-            name: deal.name,
-            value: Number(deal.value),
-            description: deal.description || "",
-            updatedAt: deal.updated_at.toISOString(),
-            owner: {
-              id: String(deal.owner_id),
-              name: deal.owner_name,
-              avatarUrl: deal.owner_avatar_url
-            }
-          }))
-        };
-      })
-    );
-    
-    return stagesWithTotals;
-  },
-
-  /**
-   * Gets full pipeline with filtering options
-   */
-  async getPipeline(filterUserId?: number, sortBy: string = 'updated') {
-    const pipelineData = await supabase
-      .from('pipelineStages')
-      .select('*')
-      .order('order', { ascending: true });
-    
-    const stagesWithDeals = await Promise.all(
-      pipelineData.map(async (stage: { id: number; name: string; color: string; order: number }) => {
-        let dealsQuery = supabase
-          .from('deals')
-          .select('*')
-          .eq('stage', stage.id);  // Changed from 'stage_id' to 'stage'
-        
-        if (filterUserId) {
-          dealsQuery = dealsQuery.eq('owner_id', filterUserId);
-        }
-        
-        if (sortBy === 'updated') {
-          dealsQuery = dealsQuery.order('updated_at', { ascending: false });
-        } else if (sortBy === 'created') {
-          dealsQuery = dealsQuery.order('created_at', { ascending: false });
-        } else if (sortBy === 'value') {
-          dealsQuery = dealsQuery.order('value', { ascending: false });
-        }
-        
-        const { data: deals, error } = await dealsQuery;
-        
-        if (error) throw error;
-        
-        return {
-          ...stage,
-          deals: deals.map((deal: any) => ({
-            id: deal.id,
-            name: deal.name,
-            value: deal.value,
-            description: deal.description || "",
-            updatedAt: deal.updated_at.toISOString(),
-            owner: {
-              id: String(deal.owner_id),
-              name: deal.owner_name,
-              avatarUrl: deal.owner_avatar_url
-            }
-          }))
-        };
-      })
-    );
-    
-    return stagesWithDeals;
   },
 };

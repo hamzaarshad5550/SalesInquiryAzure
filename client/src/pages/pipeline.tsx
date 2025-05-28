@@ -515,34 +515,6 @@ export default function PipelinePage() {
                 />
               </div>
               
-              <FormField
-                control={form.control}
-                name="ownerId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Owner</FormLabel>
-                    <Select
-                      value={String(field.value)}
-                      onValueChange={(val) => field.onChange(Number(val))}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select an owner" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {normalizedUsers.map((user) => (
-                          <SelectItem key={user.id} value={String(user.id)}>
-                            {user.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
               <DialogFooter className="mt-6">
                 <Button
                   type="button"

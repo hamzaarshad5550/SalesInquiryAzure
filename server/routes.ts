@@ -11,6 +11,7 @@ import {
   insertActivitySchema,
 } from "@shared/schema";
 import { ZodError } from "zod";
+import { z } from "zod";
 
 function debugRoute(method: string, path: string): string {
   // Enhanced debug logging for route registration
@@ -255,7 +256,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      const taskData = insertTaskSchema.partial().parse(requestBody);
+      const baseTaskSchema = z.object({
+        title: z.string(),
+        description: z.string().optional(),
+        dueDate: z.union([z.string(), z.date()]).optional(),
+        time: z.string().optional(),
+        priority: z.enum(['low', 'medium', 'high']).optional(),
+        assigned_to: z.number().optional(),
+        assignedTo: z.number().optional(),
+      });
+      const partialTaskSchema = baseTaskSchema.partial();
+      const taskData = partialTaskSchema.parse({
+        ...requestBody,
+        dueDate: requestBody.dueDate ? new Date(requestBody.dueDate) : null
+      });
+      
       const updatedTask = await storage.updateTask(taskId, taskData);
       
       if (!updatedTask) {
@@ -412,7 +427,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         contact_id: dealData.contactId,
         owner_id: dealData.ownerId,
         probability: dealData.probability,
-        expected_close_date: dealData.expectedCloseDate,
+        expected_close_date: dealData.expectedCloseDate ? new Date(dealData.expectedCloseDate).toISOString() : null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -427,10 +442,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         contactId: transformedData.contact_id,
         ownerId: transformedData.owner_id,
         description: transformedData.description,
-        expectedCloseDate: transformedData.expected_close_date,
+        expectedCloseDate: transformedData.expected_close_date ? new Date(transformedData.expected_close_date) : null,
         probability: transformedData.probability,
-        createdAt: transformedData.created_at,
-        updatedAt: transformedData.updated_at
+        createdAt: new Date(transformedData.created_at),
+        updatedAt: new Date(transformedData.updated_at)
       };
       
       const newDeal = await storage.createDeal(storageData);
