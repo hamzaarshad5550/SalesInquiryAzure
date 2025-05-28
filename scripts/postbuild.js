@@ -1,6 +1,5 @@
-import fs from 'fs';
+import fs from 'fs-extra';
 import path from 'path';
-import { exec } from 'child_process';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -17,32 +16,17 @@ if (!fs.existsSync(publicDir)) {
 }
 
 // Copy files from dist to public
-exec(`xcopy /E /I /Y "${distDir}\\*" "${publicDir}"`, (error) => {
-  if (error) {
-    console.error(`Error copying dist files: ${error}`);
-    process.exit(1);
-  }
-  console.log('Dist files copied successfully');
+fs.copySync(distDir, publicDir, { overwrite: true });
+console.log('Dist files copied successfully');
 
-  // Copy files from server to public/server
-  const publicServerDir = path.join(publicDir, 'server');
-  if (!fs.existsSync(publicServerDir)) {
-    fs.mkdirSync(publicServerDir, { recursive: true });
-  }
-  exec(`xcopy /E /I /Y "${serverDir}\\*" "${publicServerDir}"`, (error) => {
-    if (error) {
-      console.error(`Error copying server files: ${error}`);
-      process.exit(1);
-    }
-    console.log('Server files copied successfully');
+// Copy files from server to public/server
+const publicServerDir = path.join(publicDir, 'server');
+if (!fs.existsSync(publicServerDir)) {
+  fs.mkdirSync(publicServerDir, { recursive: true });
+}
+fs.copySync(serverDir, publicServerDir, { overwrite: true });
+console.log('Server files copied successfully');
 
-    // Copy web.config to public
-    fs.copyFile(webConfigPath, path.join(publicDir, 'web.config'), (error) => {
-      if (error) {
-        console.error(`Error copying web.config: ${error}`);
-        process.exit(1);
-      }
-      console.log('web.config copied successfully');
-    });
-  });
-}); 
+// Copy web.config to public
+fs.copyFileSync(webConfigPath, path.join(publicDir, 'web.config'));
+console.log('web.config copied successfully'); 
