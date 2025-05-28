@@ -10,7 +10,7 @@
     "build": "npm run build:client && npm run build:server",
     "build:client": "vite build",
     "build:server": "tsc -p tsconfig.server.json",
-    "postbuild": "if not exist public mkdir public && xcopy /E /I /Y dist\\* public\\ && xcopy /E /I /Y server\\* public\\server\\ && copy web.config public\\",
+    "postbuild": "node scripts/postbuild.js",
     "start": "node server.js",
     "postinstall": "node scripts/postinstall.js"
   },
