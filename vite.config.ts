@@ -17,7 +17,7 @@ export default defineConfig({
   },
   root: path.resolve(__dirname, "client"),
   build: {
-    outDir: "dist",
+    outDir: "public",
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, "client/src/main.tsx")
