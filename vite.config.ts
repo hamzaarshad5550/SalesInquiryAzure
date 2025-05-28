@@ -25,9 +25,6 @@ export default defineConfig({
       external: [
         // External Services
         'gapi-script',
-        'firebase',
-        'firebase/auth',
-        'firebase/app',
         
         // Database
         'pg',
@@ -86,11 +83,6 @@ export default defineConfig({
       "@tanstack/react-query",
       "@supabase/supabase-js",
       
-      // Firebase
-      "firebase",
-      "firebase/app",
-      "firebase/auth",
-
       // CSV Parsing
       "papaparse",
 
@@ -106,7 +98,10 @@ export default defineConfig({
     exclude: [
       "@babel/preset-typescript",
       "lightningcss",
-      "esbuild"
+      "esbuild",
+      "firebase",
+      "firebase/app",
+      "firebase/auth"
     ]
   },
   server: {

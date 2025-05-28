@@ -938,8 +938,8 @@ export const storage = {
         title: contactData.title,
         company: contactData.company,
         status: contactData.status,
-        assigned_to: contactData.assignedTo, // Changed from assignedTo to assigned_to
-        avatar_url: contactData.avatarUrl,   // Changed from avatarUrl to avatar_url
+        assigned_to: contactData.assignedTo,
+        avatar_url: contactData.avatarUrl,
         address: contactData.address,
         notes: contactData.notes,
         created_at: new Date().toISOString(),
@@ -979,8 +979,8 @@ export const storage = {
         title: contactData.title,
         company: contactData.company,
         status: contactData.status,
-        assigned_to: contactData.assignedTo, // Convert from assignedTo to assigned_to
-        avatar_url: contactData.avatarUrl,   // Convert from avatarUrl to avatar_url
+        assigned_to: contactData.assignedTo,
+        avatar_url: contactData.avatarUrl,
         address: contactData.address,
         notes: contactData.notes,
         updated_at: new Date().toISOString()
@@ -1283,8 +1283,8 @@ export const storage = {
         }
       }
       
-      if (taskData.assignedTo !== undefined) {
-        formattedData.assigned_to = taskData.assignedTo;
+      if (taskData.assigned_to !== undefined) {
+        formattedData.assigned_to = taskData.assigned_to;
       }
       
       // Handle related_to_type and related_to_id even if they're not in the type

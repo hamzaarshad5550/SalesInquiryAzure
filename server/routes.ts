@@ -9,6 +9,8 @@ import {
   insertDealSchema,
   insertTaskSchema,
   insertActivitySchema,
+  type InsertDeal,
+  type InsertTask,
 } from "@shared/schema";
 import { ZodError } from "zod";
 import { z } from "zod";
@@ -266,10 +268,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         assignedTo: z.number().optional(),
       });
       const partialTaskSchema = baseTaskSchema.partial();
-      const taskData = partialTaskSchema.parse({
-        ...requestBody,
-        dueDate: requestBody.dueDate ? new Date(requestBody.dueDate) : null
-      });
+      const taskData: Partial<InsertTask> = {
+        title: requestBody.title || '',
+        assigned_to: requestBody.assignedTo,
+        description: requestBody.description || null,
+        dueDate: requestBody.dueDate ? new Date(requestBody.dueDate) : null,
+        priority: requestBody.priority || 'medium',
+        time: requestBody.time || null
+      };
       
       const updatedTask = await storage.updateTask(taskId, taskData);
       
@@ -435,17 +441,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Transformed deal data for Supabase:", transformedData);
       
       // Transform back to camelCase for the storage layer
-      const storageData = {
+      const storageData: InsertDeal = {
         name: transformedData.name,
         value: transformedData.value,
         stageId: transformedData.stage_id,
         contactId: transformedData.contact_id,
         ownerId: transformedData.owner_id,
-        description: transformedData.description,
+        description: transformedData.description || null,
         expectedCloseDate: transformedData.expected_close_date ? new Date(transformedData.expected_close_date) : null,
-        probability: transformedData.probability,
-        createdAt: new Date(transformedData.created_at),
-        updatedAt: new Date(transformedData.updated_at)
+        probability: transformedData.probability || 50,
+        createdAt: new Date(),
+        updatedAt: new Date()
       };
       
       const newDeal = await storage.createDeal(storageData);
@@ -483,17 +489,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Transformed deal data for Supabase:", transformedData);
       
       // Transform back to camelCase for the storage layer
-      const storageData = {
+      const storageData: InsertDeal = {
         name: transformedData.name,
         value: transformedData.value,
         stageId: transformedData.stage_id,
         contactId: transformedData.contact_id,
         ownerId: transformedData.owner_id,
-        description: transformedData.description,
-        expectedCloseDate: transformedData.expected_close_date,
-        probability: transformedData.probability,
-        createdAt: transformedData.created_at,
-        updatedAt: transformedData.updated_at
+        description: transformedData.description || null,
+        expectedCloseDate: transformedData.expected_close_date ? new Date(transformedData.expected_close_date) : null,
+        probability: transformedData.probability || 50,
+        createdAt: new Date(),
+        updatedAt: new Date()
       };
       
       const newDeal = await storage.createDeal(storageData);
