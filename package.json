@@ -12,7 +12,7 @@
     "build:server": "tsc -p tsconfig.server.json",
     "postbuild": "if not exist public mkdir public && xcopy /E /I /Y dist\\* public\\ && xcopy /E /I /Y server\\* public\\server\\ && copy web.config public\\",
     "start": "node server.js",
-    "postinstall": "npm run build"
+    "postinstall": "node scripts/postinstall.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.4",
