@@ -203,8 +203,25 @@ export function registerRoutes(app) {
         app.get(`${apiPrefix}/tasks`, (req, res) => __awaiter(this, void 0, void 0, function* () {
             try {
                 console.log("Fetching tasks with query:", req.query);
-                const search = req.query.search;
-                const tasks = yield storage.getTasks(search);
+                const { search, priority, assignedTo, isActive } = req.query;
+                // Prepare filter options for storage.getTasks
+                const filterOptions = {};
+                if (search !== undefined) {
+                    filterOptions.search = search;
+                }
+                if (priority !== undefined && priority !== "all") {
+                    filterOptions.priority = priority;
+                }
+                if (assignedTo !== undefined && assignedTo !== "all") {
+                    const assignedToNumber = Number(assignedTo);
+                    if (!isNaN(assignedToNumber)) {
+                        filterOptions.assignedTo = assignedToNumber;
+                    }
+                }
+                if (isActive !== undefined && isActive !== "all") {
+                    filterOptions.isActive = isActive === "true";
+                }
+                const tasks = yield storage.getTasks(filterOptions);
                 console.log(`Returning ${tasks.length} tasks`);
                 res.json({ tasks });
             }
@@ -237,8 +254,7 @@ export function registerRoutes(app) {
                 // Convert dueDate string to Date object if it exists
                 if (requestBody.dueDate) {
                     try {
-                        // Keep it as a string, the storage layer will handle conversion
-                        requestBody.dueDate = requestBody.dueDate;
+                        requestBody.dueDate = new Date(requestBody.dueDate);
                     }
                     catch (e) {
                         return res.status(400).json({
@@ -247,25 +263,29 @@ export function registerRoutes(app) {
                         });
                     }
                 }
+                // Ensure assigned_to is properly handled
+                if (requestBody.assigned_to !== undefined) {
+                    const assignedToValue = Number(requestBody.assigned_to);
+                    if (isNaN(assignedToValue)) {
+                        return res.status(400).json({
+                            message: "Invalid assigned_to value",
+                            errors: [{ path: ["assigned_to"], message: "assigned_to must be a valid number" }]
+                        });
+                    }
+                    requestBody.assigned_to = assignedToValue;
+                }
                 const baseTaskSchema = z.object({
                     title: z.string(),
                     description: z.string().optional(),
-                    dueDate: z.union([z.string(), z.date()]).optional(),
+                    dueDate: z.date().optional(),
                     time: z.string().optional(),
                     priority: z.enum(['low', 'medium', 'high']).optional(),
                     assigned_to: z.number().optional(),
-                    assignedTo: z.number().optional(),
                 });
                 const partialTaskSchema = baseTaskSchema.partial();
-                const taskData = {
-                    title: requestBody.title || '',
-                    assigned_to: requestBody.assignedTo,
-                    description: requestBody.description || null,
-                    dueDate: requestBody.dueDate ? new Date(requestBody.dueDate) : null,
-                    priority: requestBody.priority || 'medium',
-                    time: requestBody.time || null
-                };
-                const updatedTask = yield storage.updateTask(taskId, taskData);
+                // Validate the task data
+                const validatedData = partialTaskSchema.parse(requestBody);
+                const updatedTask = yield storage.updateTask(taskId, validatedData);
                 if (!updatedTask) {
                     return res.status(404).json({ message: "Task not found" });
                 }
@@ -294,6 +314,36 @@ export function registerRoutes(app) {
             catch (error) {
                 console.error("Error deleting task:", error);
                 res.status(500).json({ message: "Failed to delete task" });
+            }
+        }));
+        // Endpoint to mark task as inactive
+        app.patch(`${apiPrefix}/tasks/:taskId/inactive`, (req, res) => __awaiter(this, void 0, void 0, function* () {
+            try {
+                const taskId = parseInt(req.params.taskId);
+                const updatedTask = yield storage.setTaskActiveStatus(taskId, false);
+                if (!updatedTask) {
+                    return res.status(404).json({ message: "Task not found" });
+                }
+                res.json(updatedTask);
+            }
+            catch (error) {
+                console.error("Error marking task as inactive:", error);
+                res.status(500).json({ message: "Failed to mark task as inactive" });
+            }
+        }));
+        // Endpoint to mark task as active
+        app.patch(`${apiPrefix}/tasks/:taskId/active`, (req, res) => __awaiter(this, void 0, void 0, function* () {
+            try {
+                const taskId = parseInt(req.params.taskId);
+                const updatedTask = yield storage.setTaskActiveStatus(taskId, true);
+                if (!updatedTask) {
+                    return res.status(404).json({ message: "Task not found" });
+                }
+                res.json(updatedTask);
+            }
+            catch (error) {
+                console.error("Error marking task as active:", error);
+                res.status(500).json({ message: "Failed to mark task as active" });
             }
         }));
         // Recent contacts

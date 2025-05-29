@@ -211,16 +211,17 @@ export function AdvancedCalendar() {
                 <div
                   key={dayIndex}
                   className={cn(
-                    "min-h-[120px] p-2 border rounded-lg",
-                    !isCurrentMonth && "bg-gray-50 dark:bg-gray-800",
-                    isCurrentDay && "border-primary"
+                    "min-h-[120px] p-2 border rounded-lg flex flex-col",
+                    !isCurrentMonth && "bg-gray-50 dark:bg-gray-800 text-gray-400",
+                    isCurrentDay && "border-primary bg-primary/5",
+                    "hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
                   )}
                 >
                   <div className="flex justify-between items-center mb-1">
                     <span className={cn(
-                      "text-sm font-medium",
-                      !isCurrentMonth && "text-gray-400",
-                      isCurrentDay && "text-primary"
+                      "text-lg font-bold w-8 h-8 flex items-center justify-center rounded-full",
+                      isCurrentDay ? "bg-primary text-primary-foreground" : "text-gray-900 dark:text-gray-50",
+                      !isCurrentMonth && "text-gray-400 dark:text-gray-600 bg-transparent"
                     )}>
                       {format(date, "d")}
                     </span>
@@ -230,19 +231,22 @@ export function AdvancedCalendar() {
                       </Badge>
                     )}
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-1 overflow-y-auto flex-grow">
                     {dayEvents.map((event) => (
                       <Popover key={event.id}>
                         <PopoverTrigger asChild>
                           <div
-                            className="text-xs p-1 bg-primary/10 rounded cursor-pointer hover:bg-primary/20 transition-colors"
+                            className={cn(
+                              "text-xs p-1 rounded cursor-pointer transition-colors break-words",
+                              isCurrentDay ? "bg-primary/20 hover:bg-primary/30" : "bg-secondary/20 hover:bg-secondary/30"
+                            )}
                             title={event.summary}
                           >
                             <div className="font-medium truncate">
                               {event.summary}
                             </div>
                             {event.start.dateTime && (
-                              <div className="text-gray-500 dark:text-gray-400 flex items-center">
+                              <div className="text-gray-600 dark:text-gray-400 flex items-center mt-1">
                                 <Clock className="h-3 w-3 mr-1" />
                                 {formatTime(event.start.dateTime)}
                               </div>
@@ -250,21 +254,26 @@ export function AdvancedCalendar() {
                           </div>
                         </PopoverTrigger>
                         <PopoverContent className="w-80">
-                          <div className="space-y-2">
-                            <h4 className="font-medium">{event.summary}</h4>
+                          <div className="grid gap-4">
+                            <div className="space-y-2">
+                              <h4 className="font-medium leading-none break-words">{event.summary}</h4>
+                              {event.start.dateTime && (
+                                <p className="text-sm text-muted-foreground flex items-center">
+                                  <CalendarIcon className="h-4 w-4 mr-2" />
+                                  {format(new Date(event.start.dateTime), "PPP")} {formatTime(event.start.dateTime)}
+                                  {event.end?.dateTime && ` - ${formatTime(new Date(event.end.dateTime))}`}
+                                </p>
+                              )}
+                              {event.location && (
+                                <p className="text-sm text-muted-foreground flex items-center">
+                                  <MapPin className="h-4 w-4 mr-2" />
+                                  {event.location}
+                                </p>
+                              )}
+                            </div>
                             {event.description && (
-                              <p className="text-sm text-gray-500">{event.description}</p>
-                            )}
-                            {event.start.dateTime && (
-                              <div className="flex items-center text-sm">
-                                <Clock className="h-4 w-4 mr-2" />
-                                {format(new Date(event.start.dateTime), "PPp")}
-                              </div>
-                            )}
-                            {event.location && (
-                              <div className="flex items-center text-sm">
-                                <MapPin className="h-4 w-4 mr-2" />
-                                {event.location}
+                              <div className="text-sm text-muted-foreground break-words">
+                                {event.description}
                               </div>
                             )}
                           </div>

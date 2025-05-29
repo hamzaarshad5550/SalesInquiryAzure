@@ -209,8 +209,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("Fetching tasks with query:", req.query);
       
-      const search = req.query.search as string;
-      const tasks = await storage.getTasks(search);
+      const { search, priority, assignedTo, isActive } = req.query;
+
+      // Prepare filter options for storage.getTasks
+      const filterOptions: any = {};
+
+      if (search !== undefined) {
+        filterOptions.search = search as string;
+      }
+
+      if (priority !== undefined && priority !== "all") {
+        filterOptions.priority = priority as string;
+      }
+
+      if (assignedTo !== undefined && assignedTo !== "all") {
+        const assignedToNumber = Number(assignedTo);
+        if (!isNaN(assignedToNumber)) {
+          filterOptions.assignedTo = assignedToNumber;
+        }
+      }
+
+      if (isActive !== undefined && isActive !== "all") {
+        filterOptions.isActive = isActive === "true";
+      }
+
+      const tasks = await storage.getTasks(filterOptions);
       
       console.log(`Returning ${tasks.length} tasks`);
       res.json({ tasks });
@@ -248,8 +271,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Convert dueDate string to Date object if it exists
       if (requestBody.dueDate) {
         try {
-          // Keep it as a string, the storage layer will handle conversion
-          requestBody.dueDate = requestBody.dueDate;
+          requestBody.dueDate = new Date(requestBody.dueDate);
         } catch (e) {
           return res.status(400).json({ 
             message: "Invalid date format", 
@@ -257,27 +279,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
       }
+
+      // Ensure assigned_to is properly handled
+      if (requestBody.assigned_to !== undefined) {
+        const assignedToValue = Number(requestBody.assigned_to);
+        if (isNaN(assignedToValue)) {
+          return res.status(400).json({ 
+            message: "Invalid assigned_to value", 
+            errors: [{ path: ["assigned_to"], message: "assigned_to must be a valid number" }] 
+          });
+        }
+        requestBody.assigned_to = assignedToValue;
+      }
       
       const baseTaskSchema = z.object({
         title: z.string(),
         description: z.string().optional(),
-        dueDate: z.union([z.string(), z.date()]).optional(),
+        dueDate: z.date().optional(),
         time: z.string().optional(),
         priority: z.enum(['low', 'medium', 'high']).optional(),
         assigned_to: z.number().optional(),
-        assignedTo: z.number().optional(),
       });
       const partialTaskSchema = baseTaskSchema.partial();
-      const taskData: Partial<InsertTask> = {
-        title: requestBody.title || '',
-        assigned_to: requestBody.assignedTo,
-        description: requestBody.description || null,
-        dueDate: requestBody.dueDate ? new Date(requestBody.dueDate) : null,
-        priority: requestBody.priority || 'medium',
-        time: requestBody.time || null
-      };
       
-      const updatedTask = await storage.updateTask(taskId, taskData);
+      // Validate the task data
+      const validatedData = partialTaskSchema.parse(requestBody);
+      
+      const updatedTask = await storage.updateTask(taskId, validatedData);
       
       if (!updatedTask) {
         return res.status(404).json({ message: "Task not found" });
@@ -309,6 +337,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting task:", error);
       res.status(500).json({ message: "Failed to delete task" });
+    }
+  });
+
+  // Endpoint to mark task as inactive
+  app.patch(`${apiPrefix}/tasks/:taskId/inactive`, async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.taskId);
+      const updatedTask = await storage.setTaskActiveStatus(taskId, false);
+
+      if (!updatedTask) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+
+      res.json(updatedTask);
+    } catch (error) {
+      console.error("Error marking task as inactive:", error);
+      res.status(500).json({ message: "Failed to mark task as inactive" });
+    }
+  });
+
+  // Endpoint to mark task as active
+  app.patch(`${apiPrefix}/tasks/:taskId/active`, async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.taskId);
+      const updatedTask = await storage.setTaskActiveStatus(taskId, true);
+
+      if (!updatedTask) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+
+      res.json(updatedTask);
+    } catch (error) {
+      console.error("Error marking task as active:", error);
+      res.status(500).json({ message: "Failed to mark task as active" });
     }
   });
 

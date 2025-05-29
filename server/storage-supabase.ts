@@ -1091,10 +1091,10 @@ export const storage = {
           console.error("Invalid assigned_to value:", taskData.assigned_to);
           throw new Error("assigned_to must be a valid number");
         }
-      } else if (taskData.assignedTo !== undefined) {
-        assignedTo = Number(taskData.assignedTo);
+      } else if ((taskData as any).assignedTo !== undefined) {
+        assignedTo = (taskData as any).assignedTo;
         if (isNaN(assignedTo)) {
-          console.error("Invalid assignedTo value:", taskData.assignedTo);
+          console.error("Invalid assignedTo value:", (taskData as any).assignedTo);
           throw new Error("assignedTo must be a valid number");
         }
       }
@@ -1201,57 +1201,48 @@ export const storage = {
   },
 
   /**
-   * Gets all tasks with optional search filter
+   * Gets all tasks, optionally filtered by search query, priority, assigned user, and active status.
    */
-  async getTasks(search?: string) {
+  async getTasks(options?: { search?: string; priority?: string; assignedTo?: number; isActive?: boolean }) {
     try {
-      console.log("Getting tasks with search:", search);
-      
-      // First, get the tasks
+      console.log("Fetching tasks with options:", options);
       let query = supabase
         .from('tasks')
-        .select('*');
-      
-      if (search) {
-        query = query.ilike('title', `%${search}%`);
+        .select('*, assignedUser:users(*)'); // Select all user columns
+
+      if (options?.search) {
+        query = query.or(`title.ilike.%${options.search}%,description.ilike.%${options.search}%`);
       }
-      
+
+      if (options?.priority) {
+        query = query.eq('priority', options.priority);
+      }
+
+      if (options?.assignedTo !== undefined) {
+         query = query.eq('assigned_to', options.assignedTo);
+      }
+
+      if (options?.isActive !== undefined) {
+        query = query.eq('is_active', options.isActive);
+      }
+
+      // Order by creation date descending by default
+      query = query.order('created_at', { ascending: false });
+
       const { data: tasks, error } = await query;
-      
-      if (error) {
-        console.error("Error fetching tasks from Supabase:", error);
-        throw error;
-      }
-      
-      console.log(`Found ${tasks?.length || 0} tasks`);
-      
-      // If no tasks found, return sample data
-      if (!tasks || tasks.length === 0) {
-        console.log("No tasks found, returning sample data");
-        return [
-          { 
-            id: 1, 
-            title: "Sample Task 1", 
-            description: "This is a sample task", 
-            due_date: new Date().toISOString(),
-            completed: false,
-            priority: "high",
-            assigned_to: 1,
-            assignedUser: { id: 1, name: "Demo User" }
-          }
-        ];
-      }
-      
-      // Return tasks with placeholder assignedUser
+
+      if (error) throw error;
+
+      // Map the tasks to format the assignedUser object
       return tasks.map(task => ({
         ...task,
-        assignedUser: {
-          id: task.assigned_to || 1,
-          name: `User ${task.assigned_to || 1}`
-        }
-      }));
+        assignedUser: task.assignedUser ? {
+          id: task.assignedUser.id,
+          name: task.assignedUser.username || task.assignedUser.first_name || task.assignedUser.email || `User ${task.assignedUser.id}`,
+          avatarUrl: task.assignedUser.avatar_url || null,
+        } : null,
+      })) || [];
     } catch (error) {
-      console.error("Error in getTasks:", error);
       handleError(error, 'getTasks');
       return [];
     }
@@ -1262,6 +1253,7 @@ export const storage = {
    */
   async updateTask(taskId: number, taskData: Partial<InsertTask>) {
     try {
+      console.log("Received data in updateTask:", taskData);
       // Format the data to match the database schema
       const formattedData: any = {};
       
@@ -1283,17 +1275,18 @@ export const storage = {
         }
       }
       
+      // Explicitly handle assigned_to
       if (taskData.assigned_to !== undefined) {
         formattedData.assigned_to = taskData.assigned_to;
       }
       
       // Handle related_to_type and related_to_id even if they're not in the type
       if ('relatedToType' in taskData) {
-        formattedData.related_to_type = taskData.relatedToType;
+        formattedData.related_to_type = (taskData as any).relatedToType;
       }
       
       if ('relatedToId' in taskData) {
-        formattedData.related_to_id = taskData.relatedToId;
+        formattedData.related_to_id = (taskData as any).relatedToId;
       }
       
       // Add updated_at timestamp
@@ -1443,6 +1436,43 @@ export const storage = {
     } catch (error) {
       handleError(error, 'deleteTask');
       return false;
+    }
+  },
+
+  /**
+   * Sets the active status of a task
+   */
+  async setTaskActiveStatus(taskId: number, isActive: boolean) {
+    try {
+      console.log(`Setting task ${taskId} active status to ${isActive}`);
+      const { data, error } = await supabase
+        .from('tasks')
+        .update({ is_active: isActive })
+        .eq('id', taskId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Supabase update active status error:", error);
+        throw error;
+      }
+
+      // Convert snake_case back to camelCase for the response
+      const formattedTask = {
+        ...data,
+        dueDate: data.due_date,
+        assignedTo: data.assigned_to,
+        relatedToType: data.related_to_type,
+        relatedToId: data.related_to_id,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+        isActive: data.is_active // Include isActive in response
+      };
+
+      return formattedTask;
+    } catch (error) {
+      handleError(error, 'setTaskActiveStatus');
+      return null;
     }
   }
 };
