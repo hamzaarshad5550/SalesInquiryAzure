@@ -116,7 +116,7 @@ const dealFormSchema = z.object({
   name: z.string().min(2, "Deal name must be at least 2 characters"),
   description: z.string().optional(),
   value: z.coerce.number().positive("Value must be positive"),
-  stageId: z.coerce.number({
+  stageId: z.string({
     required_error: "Please select a pipeline stage",
   }),
   expectedCloseDate: z.string().optional(),
@@ -233,15 +233,15 @@ export default function ContactDetail() {
       name: "",
       description: "",
       value: 0,
-      stageId: 1,
+      stageId: "1",
       expectedCloseDate: "",
       probability: 50,
     },
   });
 
-  // When contact data is loaded, populate the form
+  // Populate the form when contact data is loaded and entering edit mode
   useEffect(() => {
-    if (contact) {
+    if (contact && isEditing) {
       form.reset({
         name: contact.name,
         email: contact.email,
@@ -255,7 +255,7 @@ export default function ContactDetail() {
         assignedTo: contact.assignedTo || 1,
       });
     }
-  }, [contact, form]);
+  }, [contact, form, isEditing]);
 
   const updateContactMutation = useMutation({
     mutationFn: (data: ContactFormValues) => {
@@ -485,7 +485,7 @@ export default function ContactDetail() {
         name: "",
         description: "",
         value: 0,
-        stageId: 1,
+        stageId: "1",
         expectedCloseDate: "",
         probability: 50,
       });
@@ -895,7 +895,7 @@ export default function ContactDetail() {
                     name: "",
                     description: "",
                     value: 0,
-                    stageId: pipelineData?.stages?.[0]?.id || 1,
+                    stageId: "1",
                     expectedCloseDate: "",
                     probability: 50,
                   });
@@ -1041,8 +1041,8 @@ export default function ContactDetail() {
                         <FormItem>
                           <FormLabel>Pipeline Stage*</FormLabel>
                           <Select
-                            value={field.value.toString()}
-                            onValueChange={(value) => field.onChange(parseInt(value))}
+                            value={field.value}
+                            onValueChange={(value) => field.onChange(value)}
                           >
                             <FormControl>
                               <SelectTrigger>
@@ -1051,7 +1051,7 @@ export default function ContactDetail() {
                             </FormControl>
                             <SelectContent>
                               {pipelineData?.stages && pipelineData.stages.map((stage) => (
-                                <SelectItem key={stage.id} value={stage.id.toString()}>
+                                <SelectItem key={stage.id} value={stage.id}>
                                   {stage.name}
                                 </SelectItem>
                               ))}
@@ -1293,7 +1293,7 @@ export default function ContactDetail() {
                           'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
                         }`}>
                           {task.completed ? (
-                            <Check className="h-4 w-4" />
+                            null
                           ) : (
                             task.priority === 'high' ? (
                               <AlertCircle className="h-4 w-4" />
