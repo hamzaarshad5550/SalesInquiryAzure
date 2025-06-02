@@ -8,7 +8,7 @@ on:
 
 env:
   AZURE_WEBAPP_NAME: SalesInquiryGroup    # Your Azure Web App name
-  AZURE_WEBAPP_PACKAGE_PATH: '.'      # Path to your app
+  AZURE_WEBAPP_PACKAGE_PATH: 'dist'      # Path to your app's build output
   NODE_VERSION: '18.x'                # Node version to use
   AZURE_SUBSCRIPTION_ID: f47385ee-b08a-4757-b41d-264dd7366510  # Your subscription ID
 
@@ -26,14 +26,10 @@ jobs:
         cache: 'npm'
 
     - name: Install dependencies
-      run: |
-        cd client
-        npm ci
+      run: npm ci
 
     - name: Build
-      run: |
-        cd client
-        npm run build
+      run: npm run build
 
     - name: Login to Azure
       uses: azure/login@v1
