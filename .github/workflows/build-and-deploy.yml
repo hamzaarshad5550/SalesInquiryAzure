@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 env:
-  AZURE_WEBAPP_NAME: salesinquiry-app    # Your Azure Web App name
+  AZURE_WEBAPP_NAME: SalesInquiryGroup    # Your Azure Web App name
   AZURE_WEBAPP_PACKAGE_PATH: '.'      # Path to your app
   NODE_VERSION: '18.x'                # Node version to use
   AZURE_SUBSCRIPTION_ID: f47385ee-b08a-4757-b41d-264dd7366510  # Your subscription ID
