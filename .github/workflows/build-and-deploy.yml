@@ -10,6 +10,7 @@ env:
   AZURE_WEBAPP_NAME: your-app-name    # Replace with your app name
   AZURE_WEBAPP_PACKAGE_PATH: '.'      # Path to your app
   NODE_VERSION: '18.x'                # Node version to use
+  AZURE_SUBSCRIPTION_ID: f47385ee-b08a-4757-b41d-264dd7366510  # Your subscription ID
 
 jobs:
   build-and-deploy:
@@ -38,6 +39,7 @@ jobs:
       uses: azure/login@v1
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
+        subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
 
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v2
