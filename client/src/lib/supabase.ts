@@ -193,23 +193,158 @@ export async function createDeal(dealData: Record<string, any>) {
 }
 
 // Update a deal
-export async function updateDeal(dealId, updates) {
+export async function updateDeal(dealId: number, updates: Record<string, any>) {
   const { data, error } = await supabase
     .from('deals')
-    .update({
-      ...updates,
-      updated_at: new Date().toISOString()
-    })
+    .update(updates)
     .eq('id', dealId)
     .select()
     .single();
   
-  if (error) throw error;
+  if (error) {
+    console.error("Error updating deal:", error);
+    throw error;
+  }
   return data;
 }
 
-// Move a deal to a different stage
-export async function moveDealToStage(dealId: string, stageId: string) {
-  // Use 'stage' instead of 'stage_id'
+// Move a deal to a new stage
+export async function moveDealToStage(dealId: number, stageId: number) {
   return updateDeal(dealId, { stage: stageId });
+}
+
+// Fetch all campaigns
+export async function fetchCampaigns(filters = {}) {
+  console.log("Fetching campaigns with filters:", filters);
+  let query = supabase
+    .from('campaigns')
+    .select('*');
+  
+  // Apply any filters
+  if ('status' in filters && filters.status) {
+    query = query.eq('status', filters.status);
+  }
+  
+  if ('ownerId' in filters && filters.ownerId) {
+    query = query.eq('owner_id', filters.ownerId);
+  }
+  
+  // Sort by updated_at by default
+  const { data, error } = await query.order('updated_at', { ascending: false });
+  
+  if (error) {
+    console.error("Error fetching campaigns:", error);
+    throw error;
+  }
+
+  console.log("Raw campaign data from database:", data);
+
+  // Transform the data to match the frontend interface
+  const transformedData = data?.map(campaign => ({
+    id: campaign.id,
+    name: campaign.name,
+    description: campaign.description,
+    status: campaign.status,
+    startDate: campaign.start_date,
+    endDate: campaign.end_date,
+    budget: campaign.budget,
+    ownerId: campaign.owner_id,
+    createdAt: campaign.created_at,
+    updatedAt: campaign.updated_at
+  })) || [];
+
+  console.log("Transformed campaign data:", transformedData);
+  return transformedData;
+}
+
+// Create a new campaign
+export async function createCampaign(campaignData: Record<string, any>) {
+  // Transform the data to match the database schema
+  const dbData = {
+    name: campaignData.name,
+    description: campaignData.description,
+    status: campaignData.status || 'draft',
+    start_date: campaignData.startDate,
+    end_date: campaignData.endDate,
+    budget: campaignData.budget,
+    owner_id: campaignData.ownerId || 1 // Default to user ID 1 if not provided
+  };
+
+  const { data, error } = await supabase
+    .from('campaigns')
+    .insert(dbData)
+    .select()
+    .single();
+  
+  if (error) {
+    console.error("Error creating campaign:", error);
+    throw error;
+  }
+
+  // Transform the response to match the frontend interface
+  return {
+    id: data.id,
+    name: data.name,
+    description: data.description,
+    status: data.status,
+    startDate: data.start_date,
+    endDate: data.end_date,
+    budget: data.budget,
+    ownerId: data.owner_id,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at
+  };
+}
+
+// Update a campaign
+export async function updateCampaign(campaignId: number, updates: Record<string, any>) {
+  // Transform the data to match the database schema
+  const dbUpdates = {
+    name: updates.name,
+    description: updates.description,
+    status: updates.status,
+    start_date: updates.startDate,
+    end_date: updates.endDate,
+    budget: updates.budget
+  };
+
+  const { data, error } = await supabase
+    .from('campaigns')
+    .update(dbUpdates)
+    .eq('id', campaignId)
+    .select()
+    .single();
+  
+  if (error) {
+    console.error("Error updating campaign:", error);
+    throw error;
+  }
+
+  // Transform the response to match the frontend interface
+  return {
+    id: data.id,
+    name: data.name,
+    description: data.description,
+    status: data.status,
+    startDate: data.start_date,
+    endDate: data.end_date,
+    budget: data.budget,
+    ownerId: data.owner_id,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at
+  };
+}
+
+// Delete a campaign
+export async function deleteCampaign(campaignId: number) {
+  const { error } = await supabase
+    .from('campaigns')
+    .delete()
+    .eq('id', campaignId);
+  
+  if (error) {
+    console.error("Error deleting campaign:", error);
+    throw error;
+  }
+  return true;
 }

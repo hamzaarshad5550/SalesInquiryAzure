@@ -46,6 +46,22 @@ import {
 } from "@/components/ui/card";
 import Papa from 'papaparse';
 
+interface MetricsData {
+  totalRevenue: number;
+  totalDeals: number;
+  conversionRate: number;
+}
+
+interface SalesDataItem {
+  name: string;
+  current: number;
+  previous: number;
+}
+
+interface SalesData {
+  salesData: SalesDataItem[];
+}
+
 export default function Dashboard() {
   const [timeRange, setTimeRange] = useState("this-month");
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
@@ -55,11 +71,11 @@ export default function Dashboard() {
   const [location, navigate] = useLocation();
 
   // Fetch dashboard data for export
-  const { data: metricsData } = useQuery({
+  const { data: metricsData } = useQuery<MetricsData>({
     queryKey: ['/api/dashboard/metrics'],
   });
 
-  const { data: salesData } = useQuery({
+  const { data: salesData } = useQuery<SalesData>({
     queryKey: ['/api/dashboard/sales-performance', { period: timeRange }],
   });
 
@@ -67,7 +83,7 @@ export default function Dashboard() {
   const handleExport = () => {
     // Combine data for export
     const exportData = {
-      metrics: metricsData || {},
+      metrics: metricsData || {} as MetricsData,
       sales: salesData?.salesData || [],
       exportDate: new Date().toISOString(),
       timeRange: timeRange

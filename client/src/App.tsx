@@ -20,6 +20,8 @@ import { AuthProvider } from "./context/AuthContext";
 import { Sidebar } from "@/components/layout/sidebar";
 import { TopBar } from "@/components/layout/top-bar";
 import { useState } from "react";
+import Campaigns from "./pages/campaigns";
+import CampaignDetails from "./pages/CampaignDetails";
 
 function Router() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -62,6 +64,8 @@ function Router() {
           <Route path="/calendar" component={Calendar} />
           <Route path="/analytics" component={Analytics} />
           <Route path="/settings" component={Settings} />
+          <Route path="/campaigns" component={Campaigns} />
+          <Route path="/campaigns/:id" component={CampaignDetails} />
           <Route component={NotFound} />
         </Switch>
       </div>

@@ -128,8 +128,25 @@ export const activities = pgTable("activities", {
     relatedToId: integer("related_to_id"),
     metadata: jsonb("metadata"), // For storing activity-specific data
     createdAt: timestamp("created_at").defaultNow().notNull(),
+    campaignId: integer("campaign_id").references(() => campaigns.id), // Optional link to a campaign
 });
-export const insertActivitySchema = createInsertSchema(activities);
+export const insertActivitySchema = createInsertSchema(activities).extend({
+    campaignId: z.number().optional().nullable(),
+});
+export const activitiesRelations = relations(activities, ({ one }) => ({
+    user: one(users, { fields: [activities.userId], references: [users.id] }),
+    deal: one(deals, {
+        fields: [activities.relatedToId],
+        references: [deals.id],
+        relationName: "dealActivities"
+    }),
+    contact: one(contacts, {
+        fields: [activities.relatedToId],
+        references: [contacts.id],
+        relationName: "contactActivities"
+    }),
+    campaign: one(campaigns, { fields: [activities.campaignId], references: [campaigns.id] }),
+}));
 // Sales Performance Function
 export const getSalesPerformanceData = sql `
   CREATE OR REPLACE FUNCTION public.get_sales_performance_data(p_period text)
@@ -180,6 +197,50 @@ export const getSalesPerformanceData = sql `
   END;
   $$;
 `;
+// Sales Campaigns schema
+export const campaigns = pgTable("campaigns", {
+    id: serial("id").primaryKey(),
+    name: text("name").notNull(),
+    objective: text("objective"),
+    startDate: timestamp("start_date"),
+    endDate: timestamp("end_date"),
+    status: text("status").default("planning").notNull(), // planning, active, completed, cancelled
+    ownerId: integer("owner_id").references(() => users.id).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+export const insertCampaignSchema = createInsertSchema(campaigns);
+// Campaign Targets schema (linking contacts to campaigns)
+export const campaignTargets = pgTable("campaign_targets", {
+    id: serial("id").primaryKey(),
+    campaignId: integer("campaign_id").references(() => campaigns.id).notNull(),
+    contactId: integer("contact_id").references(() => contacts.id).notNull(),
+    // Could add fields here for target segment details if needed
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export const insertCampaignTargetSchema = createInsertSchema(campaignTargets);
+// Campaign Strategies/Tactics schema
+export const campaignStrategies = pgTable("campaign_strategies", {
+    id: serial("id").primaryKey(),
+    campaignId: integer("campaign_id").references(() => campaigns.id).notNull(),
+    type: text("type").notNull(), // e.g., 'email', 'event', 'promotion', 'personalized_messaging'
+    description: text("description"),
+    scheduleDate: timestamp("schedule_date"),
+    // Could add more fields for specific strategy details
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export const insertCampaignStrategySchema = createInsertSchema(campaignStrategies);
+// Campaign Materials schema
+export const campaignMaterials = pgTable("campaign_materials", {
+    id: serial("id").primaryKey(),
+    campaignId: integer("campaign_id").references(() => campaigns.id).notNull(),
+    name: text("name").notNull(),
+    type: text("type"), // e.g., 'image', 'document', 'link'
+    url: text("url").notNull(), // URL or path to the material
+    // Could add fields for upload date, file size, etc.
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export const insertCampaignMaterialSchema = createInsertSchema(campaignMaterials);
 // Define relations
 export const usersRelations = relations(users, ({ many }) => ({
     contacts: many(contacts, { relationName: "assignedContacts" }),
@@ -221,16 +282,20 @@ export const tasksRelations = relations(tasks, ({ one }) => ({
         relationName: "contactTasks"
     })
 }));
-export const activitiesRelations = relations(activities, ({ one }) => ({
-    user: one(users, { fields: [activities.userId], references: [users.id] }),
-    deal: one(deals, {
-        fields: [activities.relatedToId],
-        references: [deals.id],
-        relationName: "dealActivities"
-    }),
-    contact: one(contacts, {
-        fields: [activities.relatedToId],
-        references: [contacts.id],
-        relationName: "contactActivities"
-    })
+export const campaignsRelations = relations(campaigns, ({ one, many }) => ({
+    owner: one(users, { fields: [campaigns.ownerId], references: [users.id] }),
+    campaignTargets: many(campaignTargets),
+    campaignStrategies: many(campaignStrategies),
+    campaignMaterials: many(campaignMaterials),
+    activities: many(activities), // Activities related to this campaign
+}));
+export const campaignTargetsRelations = relations(campaignTargets, ({ one }) => ({
+    campaign: one(campaigns, { fields: [campaignTargets.campaignId], references: [campaigns.id] }),
+    contact: one(contacts, { fields: [campaignTargets.contactId], references: [contacts.id] }),
+}));
+export const campaignStrategiesRelations = relations(campaignStrategies, ({ one }) => ({
+    campaign: one(campaigns, { fields: [campaignStrategies.campaignId], references: [campaigns.id] }),
+}));
+export const campaignMaterialsRelations = relations(campaignMaterials, ({ one }) => ({
+    campaign: one(campaigns, { fields: [campaignMaterials.campaignId], references: [campaigns.id] }),
 }));

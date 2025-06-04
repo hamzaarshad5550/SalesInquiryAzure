@@ -10,7 +10,8 @@ import {
   Calendar,
   CheckSquare,
   Layers,
-  UserCircle
+  UserCircle,
+  Megaphone
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useQuery } from "@tanstack/react-query";
@@ -89,6 +90,12 @@ export function Sidebar(): React.ReactElement {
       href: "/calendar",
       icon: <Calendar className="w-5 h-5 mr-3" />,
       active: location === "/calendar",
+    },
+    {
+      label: "Campaigns",
+      href: "/campaigns",
+      icon: <Megaphone className="w-5 h-5 mr-3" />,
+      active: location === "/campaigns",
     },
     {
       label: "Analytics",

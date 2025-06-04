@@ -61,7 +61,6 @@ export default function ContactForm() {
       avatarUrl: "",
       address: "",
       notes: "",
-      assignedTo: 1, // Default to the first user for now
     },
   });
 

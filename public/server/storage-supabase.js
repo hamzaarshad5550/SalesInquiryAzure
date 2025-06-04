@@ -828,7 +828,7 @@ export const storage = {
                     title: contactData.title,
                     company: contactData.company,
                     status: contactData.status,
-                    assigned_to: contactData.assignedTo,
+                    assigned_to: contactData.assignedTo || null, // Make assigned_to optional
                     avatar_url: contactData.avatarUrl,
                     address: contactData.address,
                     notes: contactData.notes,
