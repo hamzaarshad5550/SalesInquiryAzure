@@ -2,195 +2,161 @@ import {
   type InsertContact,
   type InsertDeal,
   type InsertTask,
-  type InsertActivity
+  type InsertActivity,
+  type PipelineStage,
+  type Deal,
+  type Contact,
+  type Activity,
+  type User, // Assuming User type is in shared schema or needs definition
+  type Task // Assuming Task type is in shared schema
 } from "@shared/schema";
 import { format, subMonths, startOfMonth, endOfMonth, subYears, startOfDay, endOfDay } from "date-fns";
 import { supabase } from "./supabase";
 
-// Define interfaces for Supabase data types
-interface Deal {
-  id: number;
-  name: string;
-  value: number;
-  description?: string;
-  stage: number; // Make optional since it might not exist
-  expected_close_date?: string;
-  contact_id: number;
-  owner_id: number;
-  created_at: string;
-  updated_at: string;
-}
+// Define interfaces for data types if not fully defined in @shared/schema
+// (Ensure these match your database schema and the types used in the rest of the application)
+// Example: If User and Task are not fully defined in @shared/schema, define them here:
+// interface User { /* ... */ }
+// interface Task { /* ... */ }
 
-interface Contact {
-  id: number;
-  name: string;
-  created_at: string;
-  updated_at: string;
-  assigned_to?: number;
-  assignedUser?: User;
-}
-
-interface User {
-  id: number;
-  name: string;
-  avatarUrl?: string;
-}
-
-interface PipelineStage {
-  id: number;
-  name: string;
-  color: string;
-  order: number;
-}
-
-interface Task {
-  id: number;
-  title: string;
-  completed: boolean;
-  due_date?: string;
-  assigned_to: number;
-  assignedUser?: User;
-}
-
-// Helper functions for common query patterns
+// Helper function to handle Supabase errors consistently
 const handleError = (error: any, operation: string) => {
   console.error(`Error in ${operation}:`, error);
-  
+
   // Log more details if it's a Supabase error
   if (error.code && error.message) {
     console.error(`Supabase error (${error.code}): ${error.message}`);
     if (error.details) console.error(`Details: ${error.details}`);
     if (error.hint) console.error(`Hint: ${error.hint}`);
   }
-  
-  throw new Error(`Failed to execute ${operation}`);
+
+  // Throw a new error to be caught by the route handler
+  throw new Error(`Failed to execute ${operation}: ${error.message || error}`);
 };
 
 export const storage = {
   /**
    * Gets the current authenticated user (placeholder for auth)
    */
-  async getCurrentUser() {
+  async getCurrentUser(): Promise<User> {
     try {
       const { data, error } = await supabase
         .from('users')
         .select('*')
-        .eq('id', 1) // Default to first user for demo
+        .eq('id', 1) // Default to first user for demo if no auth
         .single();
-      
+
       if (error) throw error;
-      return data;
+      // Assuming the data structure matches the User type
+      return data as User;
     } catch (error) {
-      handleError(error, 'getCurrentUser');
+      // Return a default user or re-throw the error as appropriate
+       handleError(error, 'getCurrentUser');
+       // Fallback for development if users table is empty or user 1 doesn't exist
+       return { id: 1, name: "Default User" } as User;
     }
   },
 
   /**
    * Gets all teams
    */
-  async getAllTeams() {
+  async getAllTeams(): Promise<any[]> {
     try {
       const { data, error } = await supabase
         .from('teams')
         .select('*')
         .order('name', { ascending: true });
-      
+
       if (error) throw error;
       return data || [];
     } catch (error) {
       handleError(error, 'getAllTeams');
-      return [];
+      return []; // Return empty array on error
     }
   },
 
   /**
    * Gets all users
    */
-  async getUsers() {
+  async getUsers(): Promise<User[]> {
     try {
       const { data: users, error } = await supabase
         .from('users')
         .select('*');
-      
+
       if (error) {
         console.error("Error fetching users:", error);
-        return [{ id: 1, name: "Default User" }];
+        // Return a default user for development if fetching users fails
+        return [{ id: 1, name: "Default User" }] as User[];
       }
-      
+
       if (!users || users.length === 0) {
         console.log("No users found, returning default user");
-        return [{ id: 1, name: "Default User" }];
+        // Return a default user if no users are found
+        return [{ id: 1, name: "Default User" }] as User[];
       }
-      
-      // Log the first user to see its structure
-      if (users.length > 0) {
-        console.log("First user structure:", Object.keys(users[0]));
-        console.log("First user data:", users[0]);
-      }
-      
-      // Format users to ensure they have a name property
-      const formattedUsers = users.map(user => {
-        // Determine the best name to use
-        let displayName = "Default User";
-        
-        if (user.full_name) displayName = user.full_name;
-        else if (user.username) displayName = user.username;
-        else if (user.email) displayName = user.email;
-        else displayName = `User ${user.id}`;
-        
-        return {
-          id: user.id,
-          name: displayName
-        };
-      });
-      
-      console.log("Formatted users:", formattedUsers);
+
+      // Format users to ensure they have a name property and match the User type
+      const formattedUsers: User[] = users.map((user: any) => ({
+        id: user.id,
+        username: user.username || `user${user.id}`,
+        password: user.password || '',
+        name: user.name || user.full_name || user.username || `User ${user.id}`,
+        full_name: user.full_name || user.name || user.username || `User ${user.id}`,
+        email: user.email || '',
+        avatarUrl: user.avatar_url || null,
+        createdAt: user.createdAt ? new Date(user.createdAt) : new Date(),
+        updatedAt: user.updatedAt ? new Date(user.updatedAt) : new Date()
+      }));
+
       return formattedUsers;
     } catch (error) {
-      console.error("Error in getUsers:", error);
-      return [{ id: 1, name: "Default User" }];
+      handleError(error, 'getUsers');
+      // Return default user(s) in case of any error during fetching/formatting
+      return [{ id: 1, name: "Default User" }] as User[];
     }
   },
 
   /**
    * Gets dashboard metrics
    */
-  async getDashboardMetrics() {
+  async getDashboardMetrics(): Promise<{
+    totalDeals: number;
+    pipelineValue: number;
+    wonDeals: number;
+    wonValue: number;
+    totalContacts: number;
+    newContacts: number;
+  }> {
     try {
-      // Get deals for metrics
-      const { data: deals, error: dealsError } = await supabase
-        .from('deals')
-        .select('*');
-      
+      // Fetch all deals and contacts in parallel
+      const [{ data: deals, error: dealsError }, { data: contacts, error: contactsError }] = await Promise.all([
+        supabase.from('deals').select('*'),
+        supabase.from('contacts').select('*'),
+      ]);
+
       if (dealsError) throw dealsError;
-      
-      // Get contacts for metrics
-      const { data: contacts, error: contactsError } = await supabase
-        .from('contacts')
-        .select('*');
-      
       if (contactsError) throw contactsError;
-      
-      // Calculate metrics manually
+
       const now = new Date();
       const oneMonthAgo = subMonths(now, 1);
 
       const totalDeals = deals?.length || 0;
       const pipelineValue = deals
-        ?.filter((deal: Deal) => new Date(deal.expected_close_date || '') >= now)
+        ?.filter((deal: Deal) => deal.expectedCloseDate ? new Date(deal.expectedCloseDate) >= now : false)
         .reduce((sum: number, deal: Deal) => sum + Number(deal.value), 0) || 0;
-      
-      // Use 'stage' instead of 'stage' if that's what exists in the database
-      const wonDeals = deals?.filter((deal: Deal) => deal.stage === 5 || deal.stage === 5).length || 0;
+
+      // Assuming stage 5 is 'Closed Won'
+      const wonDeals = deals?.filter((deal: Deal) => deal.stageId === 5).length || 0; // Added type annotation
       const wonValue = deals
-        ?.filter((deal: Deal) => deal.stage === 5 || deal.stage === 5)
-        .reduce((sum: number, deal: Deal) => sum + Number(deal.value), 0) || 0;
+        ?.filter((deal: Deal) => deal.stageId === 5) // Added type annotation
+        .reduce((sum: number, deal: Deal) => sum + Number(deal.value), 0) || 0; // Added type annotation
 
       const totalContacts = contacts?.length || 0;
       const newContacts = contacts
-        ?.filter((contact: any) => new Date(contact.created_at) >= oneMonthAgo)
+        ?.filter((contact: Contact) => new Date(contact.createdAt) >= oneMonthAgo)
         .length || 0;
-      
+
       return {
         totalDeals,
         pipelineValue,
@@ -214,1265 +180,899 @@ export const storage = {
   },
 
   /**
-   * Gets sales performance data for charts
+   * Gets sales performance data for charts (stub implementation)
+   * @param period - e.g., 'monthly', 'yearly'
    */
-  async getSalesPerformanceData(period: string) {
-    try {
-      // Check if Supabase client is initialized
-      if (!supabase) {
-        console.error("Supabase client is not initialized");
+  async getSalesPerformanceData(period: string): Promise<any[]> {
+    console.log(`Fetching sales performance data for period: ${period}`);
+    // This is a stub and should be replaced with actual data aggregation logic
+    // based on deals and their closed dates/values.
+    // For now, returning sample data or empty array.
+    return [
+       { name: 'Jan', current: 5000, previous: 4200 },
+       { name: 'Feb', current: 7800, previous: 6800 },
+       { name: 'Mar', current: 4900, previous: 5100 },
+       { name: 'Apr', current: 9000, previous: 7200 },
+       { name: 'May', current: 8100, previous: 7000 },
+       { name: 'Jun', current: 10500, previous: 8300 }
+     ];
+  },
+
+  /**
+   * Gets a simplified overview of the pipeline stages (stub)
+   */
+  async getPipelineOverview(): Promise<any[]> {
+     console.log("Fetching pipeline overview (stub)");
+     // This is a stub and should return aggregated data per pipeline stage.
+     return [];
+  },
+
+  /**
+   * Gets the full pipeline with deals nested under stages.
+   * @param filterUserId - Optional user ID to filter deals.
+   * @param sortBy - Optional sorting criteria (e.g., 'updated', 'created').
+   */
+  async getPipeline(filterUserId?: number, sortBy: string = 'updated'): Promise<PipelineStage[]> {
+     try {
+       // Fetch pipeline stages and deals in parallel
+       const [{ data: stagesData, error: stagesError }, { data: dealsData, error: dealsError }] = await Promise.all([
+         supabase.from('pipeline_stages').select('*').order('order'),
+         supabase.from('deals').select(`
+           *,
+           contact:contacts(*),
+           assigned_to:users(id, name)
+         `)
+       ]);
+
+       if (stagesError) throw stagesError;
+       if (dealsError) throw dealsError;
+
+       const stages = stagesData as PipelineStage[] || [];
+       let deals = dealsData as Deal[] || [];
+
+       // Apply user filter if specified
+       if (filterUserId !== undefined) {
+          deals = deals.filter(deal => deal.ownerId === filterUserId);
+       }
+
+       // Sort deals (basic implementation)
+       deals.sort((a, b) => {
+         const dateA = new Date(sortBy === 'created' ? a.createdAt : a.updatedAt).getTime();
+         const dateB = new Date(sortBy === 'created' ? b.createdAt : b.updatedAt).getTime();
+         return dateB - dateA; // Descending order
+       });
+
+       // Group deals by stage
+       const stagesWithDeals: PipelineStage[] = stages.map(stage => {
+          const stageDeals = deals.filter(deal => deal.stageId === stage.id);
+
+         return {
+           ...stage,
+           deals: stageDeals || []
+         };
+       });
+
+       return stagesWithDeals;
+
+     } catch (error) {
+       handleError(error, 'getPipeline');
+       // Return default stages in case of error to prevent UI breakdown
+       return [
+         { id: 1, name: "Lead", color: "#6366F1", order: 1, createdAt: new Date(), updatedAt: new Date() },
+         { id: 2, name: "Qualified", color: "#8B5CF6", order: 2, createdAt: new Date(), updatedAt: new Date() },
+         { id: 3, name: "Proposal", color: "#EC4899", order: 3, createdAt: new Date(), updatedAt: new Date() },
+         { id: 4, name: "Negotiation", color: "#F59E0B", order: 4, createdAt: new Date(), updatedAt: new Date() },
+         { id: 5, name: "Closed Won", color: "#10B981", order: 5, createdAt: new Date(), updatedAt: new Date() }
+      ];
+     }
+  },
+
+  /**
+   * Gets tasks due today.
+   */
+   async getTodaysTasks(): Promise<Task[]> {
+     try {
+       const start = format(startOfDay(new Date()), 'yyyy-MM-dd HH:mm:ss');
+       const end = format(endOfDay(new Date()), 'yyyy-MM-dd HH:mm:ss');
+
+       const { data: tasks, error } = await supabase
+         .from('tasks')
+         .select(`
+           *,
+           assigned_to:users(id, name) // Fetch assigned user details
+         `)
+         .gte('due_date', start)
+         .lte('due_date', end);
+
+       if (error) throw error;
+
+       // Format tasks and ensure assigned_to is a User object or null
+       const formattedTasks: Task[] = tasks.map((task: any) => ({
+         ...task,
+         assigned_to: task.assigned_to ? { id: task.assigned_to.id, name: task.assigned_to.name } as User : null,
+         completed: task.is_completed // Assuming 'completed' maps to 'is_completed' in DB
+       }));
+
+       return formattedTasks;
+     } catch (error) {
+       handleError(error, 'getTodaysTasks');
+       return []; // Return empty array on error
+     }
+   },
+
+   /**
+    * Toggles the completion status of a task.
+    * @param taskId - The ID of the task to toggle.
+    */
+   async toggleTaskCompletion(taskId: number): Promise<Task | null> {
+     try {
+       // First, get the current state of the task
+       const { data: currentTask, error: fetchError } = await supabase
+         .from('tasks')
+         .select('id, is_completed')
+         .eq('id', taskId)
+         .single();
+
+       if (fetchError) throw fetchError;
+       if (!currentTask) return null; // Task not found
+
+       // Toggle the completion status
+       const newCompletionStatus = !currentTask.is_completed;
+
+       // Update the task
+       const { data: updatedTask, error: updateError } = await supabase
+         .from('tasks')
+         .update({ is_completed: newCompletionStatus })
+         .eq('id', taskId)
+         .select('*') // Select all columns to return the updated task
+         .single();
+
+       if (updateError) throw updateError;
+
+       // Re-fetch with user details if needed, or assume update returns full object with user
+        // For simplicity, returning the basic updated task. Re-fetch in frontend if user details are needed immediately.
+        return updatedTask as Task; // Cast to Task (may need adjustment based on select('*') return)
+
+     } catch (error) {
+       handleError(error, `toggleTaskCompletion ${taskId}`);
+       throw error; // Re-throw the error to be handled by the route handler
+     }
+   },
+
+   /**
+    * Gets recent contacts (stub).
+    */
+   async getRecentContacts(): Promise<Contact[]> {
+     console.log("Fetching recent contacts (stub)");
+      try {
+        const { data, error } = await supabase
+          .from('contacts')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(10); // Limit to 10 recent contacts
+
+        if (error) throw error;
+        return data as Contact[] || [];
+      } catch (error) {
+        handleError(error, 'getRecentContacts');
         return [];
       }
+   },
 
-      // Get all the deals data at once to avoid multiple API calls
-      const { data: allDeals, error } = await supabase
-        .from('deals')
-        .select('*')
-        .or(`stage.eq.5,stage.eq.5`); // Try both column names for Closed Won
-    
-      if (error) {
-        console.error("Supabase query error:", error);
-        return [];
-      }
-    
-      // If no deals found, return empty array with sample data for development
-      if (!allDeals || allDeals.length === 0) {
-        console.log("No deals found, returning sample data");
-        return [
-          { name: 'Jan', current: 5000, previous: 4200 },
-          { name: 'Feb', current: 7800, previous: 6800 },
-          { name: 'Mar', current: 4900, previous: 5100 },
-          { name: 'Apr', current: 9000, previous: 7200 },
-          { name: 'May', current: 8100, previous: 7000 },
-          { name: 'Jun', current: 10500, previous: 8300 }
-        ];
-      }
-    
-      const now = new Date();
-      let salesData = [];
-      
-      if (period === 'monthly') {
-        // Get last 8 months of data
-        for (let i = 7; i >= 0; i--) {
-          const monthDate = subMonths(now, i);
-          const monthStart = startOfMonth(monthDate);
-          const monthEnd = endOfMonth(monthDate);
-          
-          // Filter deals closed in this month
-          const monthDeals = allDeals.filter((deal: Deal) => {
-            const updateDate = new Date(deal.updated_at);
-            return updateDate >= monthStart && updateDate <= monthEnd;
-          });
-          
-          // Calculate total value
-          const monthValue = monthDeals.reduce((sum: number, deal: Deal) => sum + Number(deal.value), 0);
-          
-          salesData.push({
-            name: format(monthDate, 'MMM'),
-            value: monthValue
-          });
-        }
-      } else if (period === 'quarterly') {
-        // Get last 4 quarters
-        for (let i = 3; i >= 0; i--) {
-          const quarterStartMonth = i * 3;
-          const startDate = subMonths(now, quarterStartMonth + 2);
-          const endDate = subMonths(now, quarterStartMonth);
-          
-          const quarterStart = startOfMonth(startDate);
-          const quarterEnd = endOfMonth(endDate);
-          
-          // Filter deals closed in this quarter
-          const quarterDeals = allDeals.filter((deal: Deal) => {
-            const updateDate = new Date(deal.updated_at);
-            return updateDate >= quarterStart && updateDate <= quarterEnd;
-          });
-          
-          // Calculate total value
-          const quarterValue = quarterDeals.reduce((sum: number, deal: Deal) => sum + Number(deal.value), 0);
-          
-          salesData.push({
-            name: `Q${4 - i}`,
-            value: quarterValue
-          });
-        }
-      } else if (period === 'yearly') {
-        // Get last 5 years of data
-        for (let i = 4; i >= 0; i--) {
-          const yearDate = subYears(now, i);
-          const yearStart = new Date(yearDate.getFullYear(), 0, 1);
-          const yearEnd = new Date(yearDate.getFullYear(), 11, 31, 23, 59, 59);
-          
-          // Filter deals closed in this year
-          const yearDeals = allDeals.filter((deal: Deal) => {
-            const updateDate = new Date(deal.updated_at);
-            return updateDate >= yearStart && updateDate <= yearEnd;
-          });
-          
-          // Calculate total value
-          const yearValue = yearDeals.reduce((sum: number, deal: Deal) => sum + Number(deal.value), 0);
-          
-          salesData.push({
-            name: format(yearDate, 'yyyy'),
-            value: yearValue
-          });
-        }
-      }
-      
-      return salesData;
-    } catch (error) {
-      console.error("Error in getSalesPerformanceData:", error);
-      // Return sample data as fallback
-      return [
-        { name: 'Jan', current: 5000, previous: 4200 },
-        { name: 'Feb', current: 7800, previous: 6800 },
-        { name: 'Mar', current: 4900, previous: 5100 },
-        { name: 'Apr', current: 9000, previous: 7200 },
-        { name: 'May', current: 8100, previous: 7000 },
-        { name: 'Jun', current: 10500, previous: 8300 }
-      ];
-    }
-  },
-
-  /**
-   * Gets pipeline overview data for dashboard
-   */
-  async getPipelineOverview() {
+   /**
+    * Gets contacts with optional search filter.
+    * @param search - Optional search term for contact name or email.
+    */
+   async getContacts(search?: string): Promise<Contact[]> {
     try {
-      // Check if the pipeline_stages table exists
-      const { error: tableCheckError } = await supabase
-        .from('pipeline_stages')
-        .select('count')
-        .limit(1);
-      
-      // If table doesn't exist, return sample data
-      if (tableCheckError && tableCheckError.code === '42P01') {
-        console.log("pipeline_stages table doesn't exist, returning sample data");
-        return [
-          {
-            id: 1,
-            name: "Lead",
-            color: "#6366F1",
-            order: 1,
-            deals: [
-              { id: 1, title: "Sample Deal 1", value: 5000, owner: { name: "Demo User" } },
-              { id: 2, title: "Sample Deal 2", value: 7500, owner: { name: "Demo User" } }
-            ]
-          },
-          {
-            id: 2,
-            name: "Qualified",
-            color: "#8B5CF6",
-            order: 2,
-            deals: [
-              { id: 3, title: "Sample Deal 3", value: 10000, owner: { name: "Demo User" } }
-            ]
-          },
-          {
-            id: 3,
-            name: "Proposal",
-            color: "#EC4899",
-            order: 3,
-            deals: []
-          },
-          {
-            id: 4,
-            name: "Negotiation",
-            color: "#F59E0B",
-            order: 4,
-            deals: []
-          },
-          {
-            id: 5,
-            name: "Closed Won",
-            color: "#10B981",
-            order: 5,
-            deals: []
-          }
-        ];
-      }
-      
-      // Get all pipeline stages
-      const { data: stages, error: stagesError } = await supabase
-        .from('pipeline_stages')
-        .select('*')
-        .order('"order"', { ascending: true });
-      
-      if (stagesError) throw stagesError;
-      
-      // Get all deals
-      const { data: deals, error: dealsError } = await supabase
-        .from('deals')
-        .select('*');
-      
-      if (dealsError) throw dealsError;
-      
-      // Process and format the data manually since the relationship isn't working
-      const result = stages?.map((stage) => {
-        // Find deals for this stage - using 'stage' instead of 'stage'
-        const stageDeals = deals
-          ?.filter(deal => deal.stage === stage.id)
-          .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
-          .slice(0, 5); // Limit to 5 deals
-        
-        return {
-          ...stage,
-          deals: stageDeals || []
-        };
-      }) || [];
-      
-      return result;
-    } catch (error) {
-      handleError(error, 'getPipelineOverview');
-      // Return sample data as fallback
-      return [
-        {
-          id: 1,
-          name: "Lead",
-          color: "#6366F1",
-          order: 1,
-          deals: [
-            { id: 1, title: "Sample Deal 1", value: 5000, owner: { name: "Demo User" } },
-            { id: 2, title: "Sample Deal 2", value: 7500, owner: { name: "Demo User" } }
-          ]
-        },
-        {
-          id: 2,
-          name: "Qualified",
-          color: "#8B5CF6",
-          order: 2,
-          deals: [
-            { id: 3, title: "Sample Deal 3", value: 10000, owner: { name: "Demo User" } }
-          ]
-        },
-        {
-          id: 3,
-          name: "Proposal",
-          color: "#EC4899",
-          order: 3,
-          deals: []
-        },
-        {
-          id: 4,
-          name: "Negotiation",
-          color: "#F59E0B",
-          order: 4,
-          deals: []
-        },
-        {
-          id: 5,
-          name: "Closed Won",
-          color: "#10B981",
-          order: 5,
-          deals: []
-        }
-      ];
-    }
-  },
-
-  /**
-   * Gets full pipeline with filtering options
-   */
-  async getPipeline(filterUserId?: number, sortBy: string = 'updated') {
-    try {
-      // Check if the pipeline_stages table exists
-      const { error: tableCheckError } = await supabase
-        .from('pipeline_stages')
-        .select('count')
-        .limit(1);
-      
-      // If table doesn't exist, return sample data
-      if (tableCheckError && tableCheckError.code === '42P01') {
-        console.log("pipeline_stages table doesn't exist, returning sample data");
-        return [
-          {
-            id: 1,
-            name: "Lead",
-            color: "#6366F1",
-            order: 1,
-            deals: [
-              { 
-                id: 1, 
-                name: "Sample Deal 1", 
-                value: 5000, 
-                contact: { name: "John Doe" },
-                owner: { name: "Demo User" } 
-              }
-            ]
-          },
-          {
-            id: 2,
-            name: "Qualified",
-            color: "#8B5CF6",
-            order: 2,
-            deals: [
-              { 
-                id: 3, 
-                name: "Sample Deal 3", 
-                value: 10000, 
-                contact: { name: "Jane Smith" },
-                owner: { name: "Demo User" } 
-              }
-            ]
-          },
-          {
-            id: 3,
-            name: "Proposal",
-            color: "#EC4899",
-            order: 3,
-            deals: []
-          },
-          {
-            id: 4,
-            name: "Negotiation",
-            color: "#F59E0B",
-            order: 4,
-            deals: []
-          },
-          {
-            id: 5,
-            name: "Closed Won",
-            color: "#10B981",
-            order: 5,
-            deals: []
-          }
-        ];
-      }
-      
-      // Get all pipeline stages
-      const { data: stages, error: stagesError } = await supabase
-        .from('pipeline_stages')
-        .select('*')
-        .order('order', { ascending: true });
-      
-      if (stagesError) throw stagesError;
-      
-      // Get deals with filter if provided
-      let dealsQuery = supabase
-        .from('deals')
-        .select('*, contact:contacts!contact_id(*), owner:users!owner_id(*)');
-
-      if (filterUserId) {
-        dealsQuery = dealsQuery.eq('owner_id', filterUserId);
-      }
-      
-      const { data: deals, error: dealsError } = await dealsQuery;
-      
-      if (dealsError) throw dealsError;
-      
-      // Sort deals based on the sortBy parameter
-      let sortedDeals = deals;
-      if (sortBy === 'updated') {
-        sortedDeals = deals?.sort((a: Deal, b: Deal) => 
-          new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-        );
-      } else if (sortBy === 'created') {
-        sortedDeals = deals?.sort((a: Deal, b: Deal) => 
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
-      } else if (sortBy === 'value') {
-        sortedDeals = deals?.sort((a: Deal, b: Deal) => 
-          Number(b.value) - Number(a.value)
-        );
-      }
-      
-      // Process and format the data similar to what Drizzle provides
-      const result = stages?.map((stage: PipelineStage) => {
-        // Find deals for this stage
-        const stageDeals = sortedDeals?.filter((deal: Deal) => deal.stage === stage.id) || [];
-          
-        return {
-          ...stage,
-          deals: stageDeals
-        };
-      }) || [];
-      
-      return result;
-    } catch (error) {
-      handleError(error, 'getPipeline');
-      // Return sample data as fallback
-      return [
-        {
-          id: 1,
-          name: "Lead",
-          color: "#6366F1",
-          order: 1,
-          deals: [
-            { 
-              id: 1, 
-              name: "Sample Deal 1", 
-              value: 5000, 
-              contact: { name: "John Doe" },
-              owner: { name: "Demo User" } 
-            }
-          ]
-        },
-        {
-          id: 2,
-          name: "Qualified",
-          color: "#8B5CF6",
-          order: 2,
-          deals: [
-            { 
-              id: 3, 
-              name: "Sample Deal 3", 
-              value: 10000, 
-              contact: { name: "Jane Smith" },
-              owner: { name: "Demo User" } 
-            }
-          ]
-        },
-        {
-          id: 3,
-          name: "Proposal",
-          color: "#EC4899",
-          order: 3,
-          deals: []
-        },
-        {
-          id: 4,
-          name: "Negotiation",
-          color: "#F59E0B",
-          order: 4,
-          deals: []
-        },
-        {
-          id: 5,
-          name: "Closed Won",
-          color: "#10B981",
-          order: 5,
-          deals: []
-        }
-      ];
-    }
-  },
-
-  /**
-   * Gets today's tasks for the current user
-   */
-  async getTodaysTasks() {
-    try {
-      const today = new Date();
-      const startOfToday = new Date(today.setHours(0, 0, 0, 0));
-      const endOfToday = new Date(today.setHours(23, 59, 59, 999));
-      
-      // Get all tasks
-      const { data: tasks, error } = await supabase
-        .from('tasks')
-        .select('*');
-      
-      if (error) throw error;
-      
-      // If tasks is empty or null, return sample data
-      if (!tasks || tasks.length === 0) {
-        console.log("No tasks found, returning sample data");
-        return [
-          { 
-            id: 1, 
-            title: "Sample Task 1", 
-            description: "This is a sample task", 
-            due_date: today.toISOString(),
-            completed: false,
-            priority: "high",
-            assigned_to: 1,
-            assignedUser: { id: 1, name: "Demo User", avatarUrl: null }
-          }
-        ];
-      }
-      
-      // Process tasks without trying to join with users
-      const tasksWithUsers = tasks.map(task => {
-        return {
-          ...task,
-          assignedUser: {
-            id: task.assigned_to || 1,
-            name: `User ${task.assigned_to || 1}`,
-            avatarUrl: null
-          }
-        };
-      });
-      
-      // Filter for today's tasks
-      const todaysTasks = tasksWithUsers.filter(task => {
-        if (!task.due_date) return false;
-        const taskDate = new Date(task.due_date);
-        return taskDate >= startOfToday && taskDate <= endOfToday;
-      });
-      
-      return todaysTasks;
-    } catch (error) {
-      console.error("Error in getTodaysTasks:", error);
-      handleError(error, 'getTodaysTasks');
-      // Return sample data as fallback
-      const today = new Date();
-      return [
-        { 
-          id: 1, 
-          title: "Sample Task 1", 
-          description: "This is a sample task", 
-          due_date: today.toISOString(),
-          completed: false,
-          priority: "high",
-          assigned_to: 1,
-          assignedUser: { id: 1, name: "Demo User", avatarUrl: null }
-        }
-      ];
-    }
-  },
-
-  /**
-   * Toggles a task's completion status
-   */
-  async toggleTaskCompletion(taskId: number) {
-    try {
-      // First get the current task
-      const { data: task, error: getError } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('id', taskId)
-        .single();
-      
-      if (getError) throw getError;
-      
-      // Toggle the completion status
-      const { data: updatedTask, error: updateError } = await supabase
-        .from('tasks')
-        .update({ completed: !task.completed })
-        .eq('id', taskId)
-        .select()
-        .single();
-      
-      if (updateError) throw updateError;
-      
-      return updatedTask;
-    } catch (error) {
-      handleError(error, 'toggleTaskCompletion');
-      return null;
-    }
-  },
-
-  /**
-   * Gets recent contacts (last added or updated)
-   */
-  async getRecentContacts() {
-    try {
-      const { data: contacts, error } = await supabase
+      let query = supabase
         .from('contacts')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(5);
-      
-      if (error) throw error;
-      
-      // Process contacts without trying to join with users
-      const contactsWithUsers = contacts.map(contact => {
-        return {
-          ...contact,
-          assignedUser: {
-            id: contact.assigned_to || 1,
-            name: `User ${contact.assigned_to || 1}`,
-            avatarUrl: null
-          }
-        };
-      });
-      
-      return contactsWithUsers;
-    } catch (error) {
-      console.error("Error in getRecentContacts:", error);
-      handleError(error, 'getRecentContacts');
-      // Return sample data as fallback
-      return [
-        { 
-          id: 1, 
-          name: "John Doe", 
-          email: "john@example.com",
-          phone: "555-1234",
-          company: "Acme Inc",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          assigned_to: 1,
-          assignedUser: { id: 1, name: "Demo User", avatarUrl: null }
-        }
-      ];
-    }
-  },
+        .select(`
+          *,
+          assigned_to:users(id, name) // Fetch assigned user details
+        `);
 
-  /**
-   * Gets all contacts with optional search
-   */
-  async getContacts(search?: string) {
-    try {
-      // First, get contacts with basic query (no joins)
-      let query = supabase.from('contacts').select('*');
-      
       if (search) {
-        // Add search filter if provided
-        query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,company.ilike.%${search}%`);
+        query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
       }
-      
+
       const { data: contacts, error } = await query.order('name', { ascending: true });
-      
+
       if (error) throw error;
-      
-      // Get users separately
-      const { data: users, error: usersError } = await supabase
-        .from('users')
-        .select('*');
-      
-      if (usersError) throw usersError;
-      
-      // Manually join the data
-      const contactsWithUsers = contacts.map(contact => {
-        const user = users?.find(u => u.id === contact.assigned_to) || null;
-        return {
-          ...contact,
-          assignedUser: user
-        };
-      });
-      
-      return contactsWithUsers;
+
+      // Format contacts and ensure assigned_to is a User object or null
+      const formattedContacts: Contact[] = contacts.map((contact: any) => ({
+        ...contact,
+        assignedUser: contact.assigned_to ? { id: contact.assigned_to.id, name: contact.assigned_to.name } as User : null,
+        assigned_to: contact.assigned_to?.id || null // Keep the ID field as well
+      }));
+
+      return formattedContacts;
     } catch (error) {
       handleError(error, 'getContacts');
-      // Return empty array as fallback
-      return [];
+      throw error; // Re-throw the error
     }
   },
 
   /**
-   * Gets recent activities
+   * Gets recent activities (stub).
    */
-  async getRecentActivities() {
-    try {
-      const { data: activities, error } = await supabase
-        .from('activities')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(10);
-      
-      if (error) throw error;
-      
-      // Process activities without trying to join with users
-      const activitiesWithUsers = activities.map(activity => {
-        return {
-          ...activity,
-          user: {
-            id: activity.user_id || 1,
-            name: `User ${activity.user_id || 1}`,
-            avatarUrl: null
-          }
-        };
-      });
-      
-      return activitiesWithUsers || [];
-    } catch (error) {
-      console.error("Error in getRecentActivities:", error);
-      handleError(error, 'getRecentActivities');
-      return [];
-    }
+  async getRecentActivities(): Promise<Activity[]> {
+    console.log("Fetching recent activities (stub)");
+     try {
+       const { data, error } = await supabase
+         .from('activities')
+         .select('*')
+         .order('scheduled_at', { ascending: false })
+         .limit(10);
+
+       if (error) throw error;
+       return data as Activity[] || [];
+     } catch (error) {
+       handleError(error, 'getRecentActivities');
+       return [];
+     }
   },
 
   /**
-   * Gets a single contact by ID
+   * Gets a single contact by ID.
+   * @param contactId - The ID of the contact to fetch.
    */
-  async getContactById(contactId: number) {
-    try {
-      const { data: contact, error } = await supabase
-        .from('contacts')
-        .select('*, assignedUser:users!assigned_to(*)')
-        .eq('id', contactId)
-        .single();
-      
-      if (error) throw error;
-      
-      // Get deals for this contact
-      const { data: deals, error: dealsError } = await supabase
-        .from('deals')
-        .select('*, stage:pipeline_stages(*), owner:users!owner_id(*)')
-        .eq('contact_id', contactId)
-        .order('updated_at', { ascending: false });
-      
-      if (dealsError) throw dealsError;
-      
-      // Get activities for this contact
-      const { data: activities, error: activitiesError } = await supabase
-        .from('activities')
-        .select('*, user:users!user_id(*)')
-        .eq('related_to_type', 'contact')
-        .eq('related_to_id', contactId)
-        .order('created_at', { ascending: false });
-      
-      if (activitiesError) throw activitiesError;
-      
-      // Get tasks for this contact
-      const { data: tasks, error: tasksError } = await supabase
-        .from('tasks')
-        .select('*, assignedUser:users!assigned_to(*)')
-        .eq('related_to_type', 'contact')
-        .eq('related_to_id', contactId)
-        .order('due_date', { ascending: true });
-      
-      if (tasksError) throw tasksError;
-      
-      return {
-        ...contact,
-        deals: deals || [],
-        activities: activities || [],
-        tasks: tasks || []
-      };
-    } catch (error) {
-      handleError(error, 'getContactById');
-      return null;
-    }
-  },
+  async getContactById(contactId: number): Promise<Contact | null> {
+     try {
+       const { data: contact, error } = await supabase
+         .from('contacts')
+         .select(
+           `*,
+           assigned_to:users(id, name)` // Fetch assigned user details
+         )
+         .eq('id', contactId)
+         .single();
+
+       if (error) throw error;
+       if (!contact) return null;
+
+       // Format contact to include assignedUser
+       const formattedContact: Contact = {
+         ...(contact as any),
+         assignedUser: contact.assigned_to ? { id: contact.assigned_to.id, name: contact.assigned_to.name } as User : null,
+         assigned_to: contact.assigned_to?.id || null // Keep the ID field as well
+       };
+
+       return formattedContact;
+     } catch (error) {
+       handleError(error, `getContactById ${contactId}`);
+       throw error; // Re-throw the error
+     }
+   },
 
   /**
-   * Creates a new contact
+   * Creates a new contact.
+   * @param contactData - The data for the new contact.
    */
-  async createContact(contactData: InsertContact) {
-    try {
-      // Convert from camelCase to snake_case for Supabase
-      const supabaseContactData = {
-        name: contactData.name,
-        email: contactData.email,
-        phone: contactData.phone,
-        title: contactData.title,
-        company: contactData.company,
-        status: contactData.status,
-        assigned_to: contactData.assignedTo || null,  // Make assigned_to optional
-        avatar_url: contactData.avatarUrl,
-        address: contactData.address,
-        notes: contactData.notes,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-      
-      console.log("Sending to Supabase:", supabaseContactData);
-      
-      const { data: contact, error } = await supabase
-        .from('contacts')
-        .insert(supabaseContactData)
-        .select()
-        .single();
-      
-      if (error) {
-        console.error("Supabase insert error:", error);
-        throw error;
-      }
-      
-      return contact;
-    } catch (error) {
-      handleError(error, 'createContact');
-      return null;
-    }
-  },
+  async createContact(contactData: InsertContact): Promise<Contact> {
+     try {
+       const { data, error } = await supabase
+         .from('contacts')
+         .insert(contactData)
+         .select()
+         .single(); // Assuming insert returns the new row
+
+       if (error) throw error;
+       // Assuming the data structure matches the Contact type
+       return data as Contact;
+     } catch (error) {
+       handleError(error, 'createContact');
+        throw error; // Re-throw the error
+     }
+   },
 
   /**
-   * Updates an existing contact
+   * Updates an existing contact.
+   * @param contactId - The ID of the contact to update.
+   * @param contactData - The data to update.
    */
-  async updateContact(contactId: number, contactData: Partial<InsertContact>) {
-    try {
-      // Convert from camelCase to snake_case for Supabase
-      const supabaseContactData = {
-        name: contactData.name,
-        email: contactData.email,
-        phone: contactData.phone,
-        title: contactData.title,
-        company: contactData.company,
-        status: contactData.status,
-        assigned_to: contactData.assignedTo,
-        avatar_url: contactData.avatarUrl,
-        address: contactData.address,
-        notes: contactData.notes,
-        updated_at: new Date().toISOString()
-      };
+   async updateContact(contactId: number, contactData: Partial<InsertContact>): Promise<Contact | null> {
+     try {
+       const { data, error } = await supabase
+         .from('contacts')
+         .update(contactData)
+         .eq('id', contactId)
+         .select()
+         .single(); // Assuming update returns the updated row
 
-      console.log("Sending to Supabase:", supabaseContactData);
-      
-      const { data: contact, error } = await supabase
-        .from('contacts')
-        .update(supabaseContactData)
-        .eq('id', contactId)
-        .select()
-        .single();
-      
-      if (error) {
-        console.error("Supabase update error:", error);
-        throw error;
-      }
-      
-      return contact;
-    } catch (error) {
-      handleError(error, 'updateContact');
-      return null;
-    }
-  },
+       if (error) throw error;
+       // Assuming the data structure matches the Contact type
+       return data as Contact;
+     } catch (error) {
+       handleError(error, `updateContact ${contactId}`);
+        throw error; // Re-throw the error
+     }
+   },
 
   /**
-   * Deletes a contact
+   * Deletes a contact by ID.
+   * @param contactId - The ID of the contact to delete.
    */
-  async deleteContact(contactId: number) {
-    try {
-      const { error } = await supabase
-        .from('contacts')
-        .delete()
-        .eq('id', contactId);
-      
-      if (error) throw error;
-      
-      return true;
-    } catch (error) {
-      handleError(error, 'deleteContact');
-      return false;
-    }
-  },
+   async deleteContact(contactId: number): Promise<void> {
+     try {
+       const { error } = await supabase
+         .from('contacts')
+         .delete()
+         .eq('id', contactId);
+
+       if (error) throw error;
+     } catch (error) {
+       handleError(error, `deleteContact ${contactId}`);
+        throw error; // Re-throw the error
+     }
+   },
+
+   /**
+    * Creates a new deal.
+    * @param dealData - The data for the new deal.
+    */
+   async createDeal(dealData: InsertDeal): Promise<Deal> {
+     try {
+       const { data, error } = await supabase
+         .from('deals')
+         .insert(dealData)
+         .select()
+         .single(); // Assuming insert returns the new row
+
+       if (error) throw error;
+       // Assuming the data structure matches the Deal type
+       return data as Deal;
+     } catch (error) {
+       handleError(error, 'createDeal');
+        throw error; // Re-throw the error
+     }
+   },
+
+   /**
+    * Updates the stage of a deal.
+    * @param dealId - The ID of the deal to update.
+    * @param stageId - The new stage ID.
+    */
+   async updateDealStage(dealId: number, stageId: number): Promise<Deal | null> {
+     try {
+       const { data, error } = await supabase
+         .from('deals')
+         .update({ stageId: stageId })
+         .eq('id', dealId)
+         .select()
+         .single(); // Assuming update returns the updated row
+
+       if (error) throw error;
+       // Assuming the data structure matches the Deal type
+       return data as Deal;
+     } catch (error) {
+       handleError(error, `updateDealStage ${dealId}`);
+        throw error; // Re-throw the error
+     }
+   },
 
   /**
-   * Creates a new deal
+   * Creates a new task.
+   * @param taskData - The data for the new task.
    */
-  async createDeal(dealData: InsertDeal) {
-    try {
-      const { data: deal, error } = await supabase
-        .from('deals')
-        .insert({
-          ...dealData,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .select()
-        .single();
-      
-      if (error) throw error;
-      
-      return deal;
-    } catch (error) {
-      handleError(error, 'createDeal');
-      return null;
-    }
-  },
+  async createTask(taskData: InsertTask): Promise<Task> {
+     try {
+       // Map InsertTask to the actual database columns, if necessary
+       // Assuming InsertTask directly maps to task table columns, including is_completed
+
+       const { data, error } = await supabase
+         .from('tasks')
+         .insert(taskData)
+         .select()
+         .single(); // Assuming insert returns the new row
+
+       if (error) throw error;
+        // Assuming the data structure matches the Task type after inserting and selecting
+       return data as Task;
+     } catch (error) {
+       handleError(error, 'createTask');
+        throw error; // Re-throw the error
+     }
+   },
 
   /**
-   * Updates a deal's stage
+   * Updates an existing task.
+   * @param taskId - The ID of the task to update.
+   * @param taskData - The data to update.
    */
-  async updateDealStage(dealId: number, stageId: number) {
-    try {
-      const { data: deal, error } = await supabase
-        .from('deals')
-        .update({
-          stage: stageId,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', dealId)
-        .select()
-        .single();
-      
-      if (error) throw error;
-      
-      return deal;
-    } catch (error) {
-      handleError(error, 'updateDealStage');
-      return null;
-    }
-  },
+   async updateTask(taskId: number, taskData: Partial<InsertTask>): Promise<Task | null> {
+     try {
+       // Map Partial<InsertTask> to the actual database columns if necessary
+       // Assuming Partial<InsertTask> directly maps to task table columns
 
-  /**
-   * Creates a new task
-   */
-  async createTask(taskData: any) {
-    try {
-      // Log the incoming data to debug
-      console.log("Original task data:", taskData);
-      
-      // Ensure we have a valid assigned_to value
-      let assignedTo = null;
-      
-      if (taskData.assigned_to !== undefined) {
-        assignedTo = Number(taskData.assigned_to);
-        if (isNaN(assignedTo)) {
-          console.error("Invalid assigned_to value:", taskData.assigned_to);
-          throw new Error("assigned_to must be a valid number");
-        }
-      } else if ((taskData as any).assignedTo !== undefined) {
-        assignedTo = (taskData as any).assignedTo;
-        if (isNaN(assignedTo)) {
-          console.error("Invalid assignedTo value:", (taskData as any).assignedTo);
-          throw new Error("assignedTo must be a valid number");
-        }
-      }
-      
-      // Use the correct column names
-      const supabaseData = {
-        title: taskData.title,
-        description: taskData.description || null,
-        priority: taskData.priority || "medium",
-        assigned_to: assignedTo,
-        due_date: taskData.dueDate ? new Date(taskData.dueDate).toISOString() : null,
-        time: taskData.time || null,
-        related_to_type: taskData.relatedToType || null,
-        related_to_id: taskData.relatedToId ? Number(taskData.relatedToId) : null,
-        completed: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-      
-      console.log("Supabase data:", supabaseData);
-      
-      // Insert the task with the correctly formatted data
-      const { data: task, error } = await supabase
-        .from('tasks')
-        .insert(supabaseData)
-        .select()
-        .single();
-      
-      if (error) {
-        console.error("Supabase insert error:", error);
-        throw error;
-      }
-      
-      // Convert snake_case back to camelCase for the response
-      const formattedTask = {
-        ...task,
-        dueDate: task.due_date,
-        assignedTo: task.assigned_to, // For backward compatibility
-        assigned_to: task.assigned_to,
-        relatedToType: task.related_to_type,
-        relatedToId: task.related_to_id,
-        createdAt: task.created_at,
-        updatedAt: task.updated_at
-      };
-      
-      return formattedTask;
-    } catch (error) {
-      handleError(error, 'createTask');
-      return null;
-    }
-  },
+       const { data, error } = await supabase
+         .from('tasks')
+         .update(taskData)
+         .eq('id', taskId)
+         .select()
+         .single(); // Assuming update returns the updated row
 
-  /**
-   * Creates a new activity
-   */
-  async createActivity(activityData: InsertActivity) {
-    try {
-      const { data: activity, error } = await supabase
-        .from('activities')
-        .insert({
-          ...activityData,
-          created_at: new Date().toISOString()
-        })
-        .select()
-        .single();
-      
-      if (error) throw error;
-      
-      return activity;
-    } catch (error) {
-      handleError(error, 'createActivity');
-      return null;
-    }
-  },
+       if (error) throw error;
+        // Assuming the data structure matches the Task type after updating and selecting
+       return data as Task;
+     } catch (error) {
+       handleError(error, `updateTask ${taskId}`);
+        throw error; // Re-throw the error
+     }
+   },
 
-  /**
-   * Gets a single task by ID
-   */
-  async getTaskById(taskId: number) {
-    try {
-      // Get the task
-      const { data: task, error } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('id', taskId)
-        .single();
-      
-      if (error) throw error;
-      
-      // Return task with placeholder assigned user
-      return {
-        ...task,
-        assignedUser: {
-          id: task.assigned_to || 1,
-          name: `User ${task.assigned_to || 1}`,
-          avatarUrl: null
-        }
-      };
-    } catch (error) {
-      console.error("Error in getTaskById:", error);
-      handleError(error, 'getTaskById');
-      return null;
-    }
-  },
+   /**
+    * Gets a single task by ID.
+    * @param taskId - The ID of the task to fetch.
+    */
+   async getTaskById(taskId: number): Promise<Task | null> {
+     try {
+       const { data: task, error } = await supabase
+         .from('tasks')
+         .select(
+           `*,
+           assigned_to:users(id, name)` // Fetch assigned user details
+         )
+         .eq('id', taskId)
+         .single();
 
-  /**
-   * Gets all tasks, optionally filtered by search query, priority, assigned user, and active status.
-   */
-  async getTasks(options?: { search?: string; priority?: string; assignedTo?: number; isActive?: boolean }) {
+       if (error) throw error;
+       if (!task) return null;
+
+       // Format task to include assignedUser and map is_completed
+       const formattedTask: Task = {
+         ...(task as any),
+         assigned_to: task.assigned_to?.id || null, // Keep the ID field
+         assignedUser: task.assigned_to ? { id: task.assigned_to.id, name: task.assigned_to.name } as User : null,
+         completed: task.is_completed // Map is_completed to completed
+       };
+
+       return formattedTask;
+     } catch (error) {
+       handleError(error, `getTaskById ${taskId}`);
+       throw error; // Re-throw the error
+     }
+   },
+
+   /**
+    * Gets tasks with optional filters.
+    * @param options - Filtering options (search, priority, assignedTo, isActive).
+    */
+   async getTasks(options?: { search?: string; priority?: string; assignedTo?: number; isActive?: boolean }): Promise<Task[]> {
     try {
-      console.log("Fetching tasks with options:", options);
       let query = supabase
         .from('tasks')
-        .select('*, assignedUser:users(*)'); // Select all user columns
+        .select(`
+          *,
+          assigned_to:users(id, name) // Fetch assigned user details
+        `);
 
+      // Apply filters if provided
       if (options?.search) {
-        query = query.or(`title.ilike.%${options.search}%,description.ilike.%${options.search}%`);
+        query = query.ilike('description', `\%${options.search}\%`);
       }
-
       if (options?.priority) {
         query = query.eq('priority', options.priority);
       }
-
       if (options?.assignedTo !== undefined) {
-         query = query.eq('assigned_to', options.assignedTo);
+        query = query.eq('assigned_to', options.assignedTo);
       }
+       if (options?.isActive !== undefined) {
+         // Assuming isActive true means not completed (is_completed = false)
+         query = query.eq('is_completed', !options.isActive);
+       }
 
-      if (options?.isActive !== undefined) {
-        query = query.eq('is_active', options.isActive);
-      }
-
-      // Order by creation date descending by default
-      query = query.order('created_at', { ascending: false });
-
-      const { data: tasks, error } = await query;
+      const { data: tasks, error } = await query.order('due_date', { ascending: true });
 
       if (error) throw error;
 
-      // Map the tasks to format the assignedUser object
-      return tasks.map(task => ({
+      // Format tasks to include assignedUser and map is_completed
+      const formattedTasks: Task[] = tasks.map((task: any) => ({
         ...task,
-        assignedUser: task.assignedUser ? {
-          id: task.assignedUser.id,
-          name: task.assignedUser.username || task.assignedUser.first_name || task.assignedUser.email || `User ${task.assignedUser.id}`,
-          avatarUrl: task.assignedUser.avatar_url || null,
-        } : null,
-      })) || [];
+        assigned_to: task.assigned_to?.id || null, // Keep the ID field
+        assignedUser: task.assigned_to ? { id: task.assigned_to.id, name: task.assigned_to.name } as User : null,
+        completed: task.is_completed // Map is_completed to completed
+      }));
+
+      return formattedTasks;
     } catch (error) {
       handleError(error, 'getTasks');
-      return [];
+      throw error; // Re-throw the error
     }
   },
 
-  /**
-   * Updates a task
-   */
-  async updateTask(taskId: number, taskData: Partial<InsertTask>) {
-    try {
-      console.log("Received data in updateTask:", taskData);
-      // Format the data to match the database schema
-      const formattedData: any = {};
-      
-      // Copy simple fields directly
-      if (taskData.title !== undefined) formattedData.title = taskData.title;
-      if (taskData.description !== undefined) formattedData.description = taskData.description;
-      if (taskData.priority !== undefined) formattedData.priority = taskData.priority;
-      if (taskData.time !== undefined) formattedData.time = taskData.time;
-      
-      // Convert camelCase to snake_case for database fields
-      if (taskData.dueDate !== undefined) {
-        // Convert string date to ISO string if it's a string
-        if (typeof taskData.dueDate === 'string' && taskData.dueDate) {
-          formattedData.due_date = new Date(taskData.dueDate).toISOString();
-        } else if (taskData.dueDate instanceof Date) {
-          formattedData.due_date = taskData.dueDate.toISOString();
-        } else {
-          formattedData.due_date = null;
+   /**
+    * Deletes a task by ID.
+    * @param taskId - The ID of the task to delete.
+    */
+   async deleteTask(taskId: number): Promise<void> {
+     try {
+       const { error } = await supabase
+         .from('tasks')
+         .delete()
+         .eq('id', taskId);
+
+       if (error) throw error;
+     } catch (error) {
+       handleError(error, `deleteTask ${taskId}`);
+        throw error; // Re-throw the error
+     }
+   },
+
+   /**
+    * Sets the active status of a task (maps to is_completed = !isActive).
+    * @param taskId - The ID of the task to update.
+    * @param isActive - The desired active status.
+    */
+   async setTaskActiveStatus(taskId: number, isActive: boolean): Promise<Task | null> {
+     try {
+       const { data, error } = await supabase
+         .from('tasks')
+         .update({ is_completed: !isActive })
+         .eq('id', taskId)
+         .select()
+         .single(); // Assuming update returns the updated row
+
+       if (error) throw error;
+        // Assuming the data structure matches the Task type after updating and selecting
+       return data as Task;
+     } catch (error) {
+       handleError(error, `setTaskActiveStatus ${taskId}`);
+        throw error; // Re-throw the error
+     }
+   },
+
+   // Campaign functions (add placeholders or basic implementations)
+   /**
+    * Fetches campaigns with optional filters.
+    * @param filters - Optional filters (e.g., ownerId).
+    */
+   async fetchCampaigns(filters?: { ownerId?: number }): Promise<any[]> {
+     try {
+       let query = supabase
+         .from('campaigns')
+         .select('*'); // Select all columns for now
+
+       if (filters?.ownerId) {
+         query = query.eq('owner_id', filters.ownerId); // Assuming ownerId column name
+       }
+
+       const { data, error } = await query;
+
+       if (error) throw error;
+       return data || [];
+     } catch (error) {
+       handleError(error, 'fetchCampaigns');
+       return [];
+     }
+   },
+
+   /**
+    * Fetches a single campaign by ID.
+    * @param campaignId - The ID of the campaign to fetch.
+    */
+   async fetchCampaignById(campaignId: number): Promise<any | null> {
+     try {
+       const { data, error } = await supabase
+         .from('campaigns')
+         .select('*') // Select all columns for now
+         .eq('id', campaignId)
+         .single();
+
+       if (error) throw error;
+       return data;
+     } catch (error) {
+       handleError(error, `fetchCampaignById ${campaignId}`);
+       return null; // Return null if campaign not found or error occurs
+     }
+   },
+
+   /**
+    * Creates a new campaign.
+    * @param campaignData - The data for the new campaign.
+    */
+   async createCampaign(campaignData: any): Promise<any> { // Use a specific type instead of any if schema is available
+     try {
+       const { data, error } = await supabase
+         .from('campaigns')
+         .insert(campaignData)
+         .select() // Select the inserted row
+         .single(); // Assuming insert returns the new row
+
+       if (error) throw error;
+       return data; // Return the created campaign object
+     } catch (error) {
+       handleError(error, 'createCampaign');
+       throw error; // Re-throw the error
+     }
+   },
+
+   /**
+    * Updates an existing campaign.
+    * @param campaignId - The ID of the campaign to update.
+    * @param campaignData - The data to update.
+    */
+   async updateCampaign(campaignId: number, campaignData: any): Promise<any | null> { // Use a specific type instead of any
+     try {
+       const { data, error } = await supabase
+         .from('campaigns')
+         .update(campaignData)
+         .eq('id', campaignId)
+         .select() // Select the updated row
+         .single(); // Assuming update returns the updated row
+
+       if (error) throw error;
+       return data; // Return the updated campaign object
+     } catch (error) {
+       handleError(error, `updateCampaign ${campaignId}`);
+       throw error; // Re-throw the error
+     }
+   },
+
+   /**
+    * Deletes a campaign by ID.
+    * @param campaignId - The ID of the campaign to delete.
+    */
+   async deleteCampaign(campaignId: number): Promise<void> {
+     try {
+       const { error } = await supabase
+         .from('campaigns')
+         .delete()
+         .eq('id', campaignId);
+
+       if (error) throw error;
+     } catch (error) {
+       handleError(error, `deleteCampaign ${campaignId}`);
+       throw error; // Re-throw the error
+     }
+   },
+
+    /**
+     * Fetches targets for a specific campaign.
+     * @param campaignId - The ID of the campaign.
+     */
+    async fetchCampaignTargets(campaignId: number): Promise<any[]> { // Use a specific type instead of any[]
+      try {
+        const { data, error } = await supabase
+          .from('campaign_targets')
+          .select(`
+            *,
+            contact:contacts(*) // Fetch related contact details
+          `)
+          .eq('campaign_id', campaignId);
+
+        if (error) throw error;
+        return data || [];
+      } catch (error) {
+        handleError(error, `fetchCampaignTargets ${campaignId}`);
+        return [];
+      }
+    },
+
+    /**
+     * Adds a contact as a target for a campaign.
+     * @param campaignId - The ID of the campaign.
+     * @param contactId - The ID of the contact.
+     * @param status - The status of the target (e.g., 'pending', 'contacted').
+     */
+    async addCampaignTarget(campaignId: number, contactId: number, status: string): Promise<any> { // Use a specific type instead of any
+      try {
+        const { data, error } = await supabase
+          .from('campaign_targets')
+          .insert({
+            campaign_id: campaignId,
+            contact_id: contactId,
+            status: status
+          })
+          .select() // Select the inserted row
+          .single(); // Assuming insert returns the new row
+
+        if (error) throw error;
+        return data; // Return the created campaign target
+      } catch (error) {
+        handleError(error, 'addCampaignTarget');
+         throw error; // Re-throw the error
+      }
+    },
+
+    /**
+     * Removes a target from a campaign.
+     * @param targetId - The ID of the campaign target to remove.
+     */
+    async removeCampaignTarget(targetId: number): Promise<void> {
+      try {
+        const { error } = await supabase
+          .from('campaign_targets')
+          .delete()
+          .eq('id', targetId);
+
+        if (error) throw error;
+      } catch (error) {
+        handleError(error, `removeCampaignTarget ${targetId}`);
+         throw error; // Re-throw the error
+      }
+    },
+
+    /**
+     * Updates the status of a campaign target.
+     * @param targetId - The ID of the campaign target.
+     * @param newStatus - The new status.
+     */
+    async updateCampaignTargetStatus(targetId: number, newStatus: string): Promise<any | null> { // Use a specific type instead of any
+      try {
+        const { data, error } = await supabase
+          .from('campaign_targets')
+          .update({ status: newStatus })
+          .eq('id', targetId)
+          .select() // Select the updated row
+          .single(); // Assuming update returns the updated row
+
+        if (error) throw error;
+        return data; // Return the updated campaign target
+      } catch (error) {
+        handleError(error, `updateCampaignTargetStatus ${targetId}`);
+         throw error; // Re-throw the error
+      }
+    },
+
+    /**
+     * Fetches activities for a specific campaign.
+     * @param campaignId - The ID of the campaign.
+     */
+    async fetchCampaignActivities(campaignId: number): Promise<any[]> { // Use a specific type instead of any[]
+      try {
+        const { data, error } = await supabase
+          .from('campaign_activities')
+          .select('*') // Select all columns for now
+          .eq('campaign_id', campaignId)
+          .order('scheduled_at', { ascending: true });
+
+        if (error) throw error;
+        return data || [];
+      } catch (error) {
+        handleError(error, `fetchCampaignActivities ${campaignId}`);
+        return [];
+      }
+    },
+
+     /**
+      * Adds a new activity to a campaign.
+      * @param activityData - The data for the new activity.
+      */
+     async addCampaignActivity(activityData: any): Promise<any> { // Use a specific type instead of any
+       try {
+         const { data, error } = await supabase
+           .from('campaign_activities')
+           .insert(activityData)
+           .select() // Select the inserted row
+           .single(); // Assuming insert returns the new row
+
+         if (error) throw error;
+         return data; // Return the created activity
+       } catch (error) {
+         handleError(error, 'addCampaignActivity');
+          throw error; // Re-throw the error
+       }
+     },
+
+     /**
+      * Updates an existing campaign activity.
+      * @param activityId - The ID of the activity to update.
+      * @param activityData - The data to update.
+      */
+     async updateCampaignActivity(activityId: number, activityData: any): Promise<any | null> { // Use a specific type instead of any
+       try {
+         const { data, error } = await supabase
+           .from('campaign_activities')
+           .update(activityData)
+           .eq('id', activityId)
+           .select() // Select the updated row
+           .single(); // Assuming update returns the updated row
+
+         if (error) throw error;
+         return data; // Return the updated activity
+       } catch (error) {
+         handleError(error, `updateCampaignActivity ${activityId}`);
+          throw error; // Re-throw the error
+       }
+     },
+
+     /**
+      * Deletes a campaign activity by ID.
+      * @param activityId - The ID of the activity to delete.
+      */
+     async deleteCampaignActivity(activityId: number): Promise<void> {
+       try {
+         const { error } = await supabase
+           .from('campaign_activities')
+           .delete()
+           .eq('id', activityId);
+
+         if (error) throw error;
+       } catch (error) {
+         handleError(error, `deleteCampaignActivity ${activityId}`);
+          throw error; // Re-throw the error
+       }
+     },
+
+     /**
+      * Fetches metrics for a specific campaign.
+      * @param campaignId - The ID of the campaign.
+      */
+     async fetchCampaignMetrics(campaignId: number): Promise<any[]> { // Use a specific type instead of any[]
+       try {
+         const { data, error } = await supabase
+           .from('campaign_metrics')
+           .select('*') // Select all columns for now
+           .eq('campaign_id', campaignId)
+           .order('recorded_at', { ascending: true });
+
+         if (error) throw error;
+         return data || [];
+       } catch (error) {
+         handleError(error, `fetchCampaignMetrics ${campaignId}`);
+         return [];
+       }
+     },
+
+      /**
+       * Adds a new metric to a campaign.
+       * @param metricData - The data for the new metric.
+       */
+      async addCampaignMetric(metricData: any): Promise<any> { // Use a specific type instead of any
+        try {
+          const { data, error } = await supabase
+            .from('campaign_metrics')
+            .insert(metricData)
+            .select() // Select the inserted row
+            .single(); // Assuming insert returns the new row
+
+          if (error) throw error;
+          return data; // Return the created metric
+        } catch (error) {
+          handleError(error, 'addCampaignMetric');
+           throw error; // Re-throw the error
         }
-      }
-      
-      // Explicitly handle assigned_to
-      if (taskData.assigned_to !== undefined) {
-        formattedData.assigned_to = taskData.assigned_to;
-      }
-      
-      // Handle related_to_type and related_to_id even if they're not in the type
-      if ('relatedToType' in taskData) {
-        formattedData.related_to_type = (taskData as any).relatedToType;
-      }
-      
-      if ('relatedToId' in taskData) {
-        formattedData.related_to_id = (taskData as any).relatedToId;
-      }
-      
-      // Add updated_at timestamp
-      formattedData.updated_at = new Date().toISOString();
-      
-      console.log("Updating task with data:", formattedData);
-      
-      // Update the task
-      const { data, error } = await supabase
-        .from('tasks')
-        .update(formattedData)
-        .eq('id', taskId)
-        .select()
-        .single();
-      
-      if (error) {
-        console.error("Update error:", error);
-        throw error;
-      }
-      
-      // Convert snake_case back to camelCase for the response
-      const formattedTask = {
-        ...data,
-        dueDate: data.due_date,
-        assignedTo: data.assigned_to,
-        relatedToType: data.related_to_type,
-        relatedToId: data.related_to_id,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at
-      };
-      
-      return formattedTask;
-    } catch (error) {
-      handleError(error, 'updateTask');
-      return null;
-    }
-  },
+      },
 
-  /**
-   * Gets all pipeline stages
-   */
-  async getPipelineStages() {
-    try {
-      // Check if the pipeline_stages table exists
-      const { error: tableCheckError } = await supabase
-        .from('pipeline_stages')
-        .select('count')
-        .limit(1);
-      
-      // If table doesn't exist, return sample data
-      if (tableCheckError && tableCheckError.code === '42P01') {
-        console.log("pipeline_stages table doesn't exist, returning sample data");
-        return [
-          {
-            id: 1,
-            name: "Lead",
-            color: "#6366F1",
-            order: 1
-          },
-          {
-            id: 2,
-            name: "Qualified",
-            color: "#8B5CF6",
-            order: 2
-          },
-          {
-            id: 3,
-            name: "Proposal",
-            color: "#EC4899",
-            order: 3
-          },
-          {
-            id: 4,
-            name: "Negotiation",
-            color: "#F59E0B",
-            order: 4
-          },
-          {
-            id: 5,
-            name: "Closed Won",
-            color: "#10B981",
-            order: 5
-          }
-        ];
-      }
-      
-      // Get all pipeline stages
-      const { data: stages, error: stagesError } = await supabase
-        .from('pipeline_stages')
-        .select('*')
-        .order('order', { ascending: true });
-      
-      if (stagesError) throw stagesError;
-      
-      return stages || [];
-    } catch (error) {
-      handleError(error, 'getPipelineStages');
-      // Return sample data as fallback
-      return [
-        {
-          id: 1,
-          name: "Lead",
-          color: "#6366F1",
-          order: 1
-        },
-        {
-          id: 2,
-          name: "Qualified",
-          color: "#8B5CF6",
-          order: 2
-        },
-        {
-          id: 3,
-          name: "Proposal",
-          color: "#EC4899",
-          order: 3
-        },
-        {
-          id: 4,
-          name: "Negotiation",
-          color: "#F59E0B",
-          order: 4
-        },
-        {
-          id: 5,
-          name: "Closed Won",
-          color: "#10B981",
-          order: 5
+      /**
+       * Updates an existing campaign metric.
+       * @param metricId - The ID of the metric to update.
+       * @param metricData - The data to update.
+       */
+      async updateCampaignMetric(metricId: number, metricData: any): Promise<any | null> { // Use a specific type instead of any
+        try {
+          const { data, error } = await supabase
+            .from('campaign_metrics')
+            .update(metricData)
+            .eq('id', metricId)
+            .select() // Select the updated row
+            .single(); // Assuming update returns the updated row
+
+          if (error) throw error;
+          return data; // Return the updated metric
+        } catch (error) {
+          handleError(error, `updateCampaignMetric ${metricId}`);
+           throw error; // Re-throw the error
         }
-      ];
-    }
-  },
+      },
 
-  /**
-   * Deletes a task
-   */
-  async deleteTask(taskId: number) {
-    try {
-      const { error } = await supabase
-        .from('tasks')
-        .delete()
-        .eq('id', taskId);
-      
-      if (error) throw error;
-      
-      return true;
-    } catch (error) {
-      handleError(error, 'deleteTask');
-      return false;
-    }
-  },
+      /**
+       * Deletes a campaign metric by ID.
+       * @param metricId - The ID of the metric to delete.
+       */
+      async deleteCampaignMetric(metricId: number): Promise<void> {
+        try {
+          const { error } = await supabase
+            .from('campaign_metrics')
+            .delete()
+            .eq('id', metricId);
 
-  /**
-   * Sets the active status of a task
-   */
-  async setTaskActiveStatus(taskId: number, isActive: boolean) {
-    try {
-      console.log(`Setting task ${taskId} active status to ${isActive}`);
-      const { data, error } = await supabase
-        .from('tasks')
-        .update({ is_active: isActive })
-        .eq('id', taskId)
-        .select()
-        .single();
-
-      if (error) {
-        console.error("Supabase update active status error:", error);
-        throw error;
-      }
-
-      // Convert snake_case back to camelCase for the response
-      const formattedTask = {
-        ...data,
-        dueDate: data.due_date,
-        assignedTo: data.assigned_to,
-        relatedToType: data.related_to_type,
-        relatedToId: data.related_to_id,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-        isActive: data.is_active // Include isActive in response
-      };
-
-      return formattedTask;
-    } catch (error) {
-      handleError(error, 'setTaskActiveStatus');
-      return null;
-    }
-  }
+          if (error) throw error;
+        } catch (error) {
+          handleError(error, `deleteCampaignMetric ${metricId}`);
+           throw error; // Re-throw the error
+        }
+      },
 };

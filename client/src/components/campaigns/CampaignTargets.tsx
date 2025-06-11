@@ -44,6 +44,7 @@ export function CampaignTargets({ campaignId }: CampaignTargetsProps) {
   const [targets, setTargets] = useState<CampaignTarget[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [selectedContactId, setSelectedContactId] = useState<string>('');
@@ -147,8 +148,9 @@ export function CampaignTargets({ campaignId }: CampaignTargetsProps) {
   };
 
   const filteredTargets = targets.filter((target) =>
-    target.contact.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    target.contact.email.toLowerCase().includes(searchQuery.toLowerCase())
+    (target.contact.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    target.contact.email.toLowerCase().includes(searchQuery.toLowerCase())) &&
+    (statusFilter === 'all' || target.status === statusFilter)
   );
 
   return (
@@ -163,6 +165,19 @@ export function CampaignTargets({ campaignId }: CampaignTargetsProps) {
             className="pl-10"
           />
         </div>
+
+        <Select onValueChange={setStatusFilter} defaultValue="all">
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Filter by Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Statuses</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="contacted">Contacted</SelectItem>
+            <SelectItem value="interested">Interested</SelectItem>
+            <SelectItem value="not_interested">Not Interested</SelectItem>
+          </SelectContent>
+        </Select>
 
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
@@ -186,7 +201,7 @@ export function CampaignTargets({ campaignId }: CampaignTargetsProps) {
                 <SelectContent>
                   {contacts.map((contact) => (
                     <SelectItem key={contact.id} value={contact.id.toString()}>
-                      {contact.name}
+                      {contact.name} ({contact.email})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -229,7 +244,7 @@ export function CampaignTargets({ campaignId }: CampaignTargetsProps) {
                   <SelectTrigger className="w-32">
                     <SelectValue>
                       <Badge className={getStatusColor(target.status)}>
-                        {target.status}
+                        {target.status.charAt(0).toUpperCase() + target.status.slice(1)}
                       </Badge>
                     </SelectValue>
                   </SelectTrigger>
@@ -252,6 +267,11 @@ export function CampaignTargets({ campaignId }: CampaignTargetsProps) {
               </TableCell>
             </TableRow>
           ))}
+          {!loading && filteredTargets.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={5} className="text-center">No targets found.</TableCell>
+            </TableRow>
+          )}
         </TableBody>
       </Table>
     </div>

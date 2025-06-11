@@ -1,5 +1,6 @@
+// client/src/components/campaigns/CampaignForm.tsx
 import React from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '../ui/button';
@@ -39,46 +40,101 @@ const campaignSchema = z.object({
   end_date: z.date({
     required_error: 'End date is required',
   }),
-  status: z.enum(['draft', 'active', 'completed', 'cancelled']),
-  budget: z.string().transform((val) => parseFloat(val) || 0),
+  status: z.enum(['draft', 'pending', 'approved', 'rejected', 'active', 'completed', 'cancelled', 'planning']),
+  budget: z.coerce.number(),
+  campaign_type: z.string().optional(),
+  target_audience: z.string().optional().transform((val) => val ? val.split(',').map(s => s.trim()) : []),
+  products: z.string().optional().transform((val) => val ? val.split(',').map(s => s.trim()) : []),
+  locations: z.string().optional().transform((val) => val ? val.split(',').map(s => s.trim()) : []),
+  marketing_channels: z.string().optional().transform((val) => val ? val.split(',').map(s => s.trim()) : []),
+  success_metrics: z.any().optional(),
+  media_assets: z.any().optional(),
+  compliance_notes: z.string().optional(),
+  approved_by: z.string().optional().transform((val) => val ? parseInt(val, 10) : undefined),
+  approval_date: z.date().optional().nullable(),
+  actual_spend: z.coerce.number().optional(),
+  thumbnail_url: z.string().url("Invalid URL").optional().or(z.literal("")).transform((val) => {
+    if (val && val.includes("drive.google.com/uc?export=view&id=")) {
+      const urlParams = new URLSearchParams(val.split('?')[1]);
+      const id = urlParams.get('id');
+      if (id) {
+        return `https://drive.google.com/uc?export=download&id=${id}`;
+      }
+    }
+    return val;
+  }),
+  tags: z.string().optional().transform((val) => val ? val.split(',').map(s => s.trim()) : []),
+  rich_description: z.string().optional(),
+  last_status_update: z.date().optional().nullable(),
 });
 
-type CampaignFormValues = z.infer<typeof campaignSchema>;
+export type CampaignFormOutput = z.infer<typeof campaignSchema>;
+export type CampaignFormInput = z.input<typeof campaignSchema>;
 
 interface CampaignFormProps {
   initialData?: {
+    id?: number;
     name: string;
     description?: string;
-    start_date: string;
-    end_date: string;
+    startDate: string;
+    endDate: string;
     status: string;
-    budget: number;
+    budget?: number;
+    campaign_type?: string;
+    target_audience?: string[];
+    products?: string[];
+    locations?: string[];
+    marketing_channels?: string[];
+    success_metrics?: any;
+    media_assets?: any;
+    compliance_notes?: string;
+    approved_by?: number;
+    approval_date?: string | null;
+    actual_spend?: number;
+    thumbnail_url?: string;
+    tags?: string[];
+    rich_description?: string;
+    last_status_update?: string | null;
   };
-  onSubmit: (data: CampaignFormValues) => void;
+  onSubmit: (data: CampaignFormOutput) => void;
   onCancel: () => void;
 }
 
 export function CampaignForm({ initialData, onSubmit, onCancel }: CampaignFormProps) {
-  const form = useForm<CampaignFormValues>({
+  const defaultValues: CampaignFormInput = {
+    name: initialData?.name || '',
+    description: initialData?.description || '',
+    start_date: initialData?.startDate ? new Date(initialData.startDate) : new Date(),
+    end_date: initialData?.endDate ? new Date(initialData.endDate) : new Date(),
+    status: (initialData?.status || 'draft') as 'draft' | 'pending' | 'approved' | 'rejected' | 'active' | 'completed' | 'cancelled' | 'planning',
+    budget: initialData?.budget?.toString() || '0',
+    campaign_type: initialData?.campaign_type || '',
+    target_audience: initialData?.target_audience?.join(', ') || '',
+    products: initialData?.products?.join(', ') || '',
+    locations: initialData?.locations?.join(', ') || '',
+    marketing_channels: initialData?.marketing_channels?.join(', ') || '',
+    success_metrics: initialData?.success_metrics || undefined,
+    media_assets: initialData?.media_assets || undefined,
+    compliance_notes: initialData?.compliance_notes || '',
+    approved_by: initialData?.approved_by?.toString() || '',
+    approval_date: initialData?.approval_date ? new Date(initialData.approval_date) : null,
+    actual_spend: initialData?.actual_spend?.toString() || '0',
+    thumbnail_url: initialData?.thumbnail_url || '',
+    tags: initialData?.tags?.join(', ') || '',
+    rich_description: initialData?.rich_description || '',
+    last_status_update: initialData?.last_status_update ? new Date(initialData.last_status_update) : null,
+  };
+
+  const form = useForm<CampaignFormInput>({
     resolver: zodResolver(campaignSchema),
-    defaultValues: initialData
-      ? {
-          ...initialData,
-          start_date: new Date(initialData.start_date),
-          end_date: new Date(initialData.end_date),
-          budget: initialData.budget.toString(),
-        }
-      : {
-          name: '',
-          description: '',
-          status: 'draft',
-          budget: '0',
-        },
+    defaultValues: defaultValues,
   });
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={form.handleSubmit((data) => {
+        onSubmit(data as CampaignFormOutput);
+      })} className="space-y-4">
         <FormField
           control={form.control}
           name="name"
@@ -95,23 +151,47 @@ export function CampaignForm({ initialData, onSubmit, onCancel }: CampaignFormPr
 
         <FormField
           control={form.control}
-          name="description"
+          name="thumbnail_url"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Description</FormLabel>
+              <FormLabel>Campaign Thumbnail / Image URL</FormLabel>
               <FormControl>
-                <Textarea
-                  placeholder="Enter campaign description"
-                  className="resize-none"
-                  {...field}
-                />
+                <Input placeholder="Enter image URL" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
 
-        <div className="grid grid-cols-2 gap-4">
+        <FormField
+          control={form.control}
+          name="description"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Description</FormLabel>
+              <FormControl>
+                <Textarea placeholder="Enter campaign description" className="resize-none" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="rich_description"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Rich Description</FormLabel>
+              <FormControl>
+                <Textarea placeholder="Enter detailed campaign description (e.g., eligibility, terms)" className="resize-none" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
             name="start_date"
@@ -122,14 +202,14 @@ export function CampaignForm({ initialData, onSubmit, onCancel }: CampaignFormPr
                   <PopoverTrigger asChild>
                     <FormControl>
                       <Button
-                        variant="outline"
+                        variant={"outline"}
                         className={cn(
-                          'w-full pl-3 text-left font-normal',
-                          !field.value && 'text-muted-foreground'
+                          "w-full pl-3 text-left font-normal",
+                          !field.value && "text-muted-foreground"
                         )}
                       >
                         {field.value ? (
-                          format(field.value, 'PPP')
+                          format(field.value, "PPP")
                         ) : (
                           <span>Pick a date</span>
                         )}
@@ -142,9 +222,6 @@ export function CampaignForm({ initialData, onSubmit, onCancel }: CampaignFormPr
                       mode="single"
                       selected={field.value}
                       onSelect={field.onChange}
-                      disabled={(date) =>
-                        date < new Date() || date < new Date('1900-01-01')
-                      }
                       initialFocus
                     />
                   </PopoverContent>
@@ -153,7 +230,6 @@ export function CampaignForm({ initialData, onSubmit, onCancel }: CampaignFormPr
               </FormItem>
             )}
           />
-
           <FormField
             control={form.control}
             name="end_date"
@@ -164,14 +240,14 @@ export function CampaignForm({ initialData, onSubmit, onCancel }: CampaignFormPr
                   <PopoverTrigger asChild>
                     <FormControl>
                       <Button
-                        variant="outline"
+                        variant={"outline"}
                         className={cn(
-                          'w-full pl-3 text-left font-normal',
-                          !field.value && 'text-muted-foreground'
+                          "w-full pl-3 text-left font-normal",
+                          !field.value && "text-muted-foreground"
                         )}
                       >
                         {field.value ? (
-                          format(field.value, 'PPP')
+                          format(field.value, "PPP")
                         ) : (
                           <span>Pick a date</span>
                         )}
@@ -184,9 +260,6 @@ export function CampaignForm({ initialData, onSubmit, onCancel }: CampaignFormPr
                       mode="single"
                       selected={field.value}
                       onSelect={field.onChange}
-                      disabled={(date) =>
-                        date < new Date() || date < new Date('1900-01-01')
-                      }
                       initialFocus
                     />
                   </PopoverContent>
@@ -197,47 +270,201 @@ export function CampaignForm({ initialData, onSubmit, onCancel }: CampaignFormPr
           />
         </div>
 
-        <FormField
-          control={form.control}
-          name="status"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Status</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="status"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Status</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="planning">Planning</SelectItem>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="approved">Approved</SelectItem>
+                    <SelectItem value="rejected">Rejected</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="budget"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Budget</FormLabel>
                 <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
+                  <Input
+                    type="text"
+                    placeholder="Enter campaign budget"
+                    {...field}
+                    value={field.value?.toString() || ''}
+                    onChange={field.onChange}
+                  />
                 </FormControl>
-                <SelectContent>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="campaign_type"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Campaign Type</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select campaign type" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="email">Email</SelectItem>
+                    <SelectItem value="social_media">Social Media</SelectItem>
+                    <SelectItem value="web_banner">Web Banner</SelectItem>
+                    <SelectItem value="print">Print</SelectItem>
+                    <SelectItem value="video">Video</SelectItem>
+                    <SelectItem value="event">Event</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="tags"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Tags or Categories (comma-separated)</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="e.g., Health, Wellness, Prescription"
+                    {...field}
+                    value={Array.isArray(field.value) ? field.value.join(', ') : field.value || ''}
+                    onChange={e => field.onChange(e.target.value)}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="target_audience"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Target Patient Segments (comma-separated)</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="e.g., Seniors, Children, Diabetics"
+                    {...field}
+                    value={Array.isArray(field.value) ? field.value.join(', ') : field.value || ''}
+                    onChange={e => field.onChange(e.target.value)}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="products"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Product Associations (comma-separated)</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="e.g., Vitamin D, Zinc, Cold Relief Kits"
+                    {...field}
+                    value={Array.isArray(field.value) ? field.value.join(', ') : field.value || ''}
+                    onChange={e => field.onChange(e.target.value)}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
 
         <FormField
           control={form.control}
-          name="budget"
+          name="compliance_notes"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Budget</FormLabel>
+              <FormLabel>Compliance Notes</FormLabel>
               <FormControl>
-                <Input
-                  type="number"
-                  placeholder="Enter campaign budget"
-                  {...field}
-                />
+                <Textarea placeholder="Enter any compliance related notes" className="resize-none" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="approved_by"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Approved By</FormLabel>
+                <FormControl>
+                  <Input
+                    type="text"
+                    placeholder="Enter approver user ID"
+                    {...field}
+                    value={field.value?.toString() || ''}
+                    onChange={field.onChange}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="actual_spend"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Actual Spend</FormLabel>
+                <FormControl>
+                  <Input
+                    type="text"
+                    placeholder="Enter actual spend"
+                    {...field}
+                    value={field.value?.toString() || ''}
+                    onChange={field.onChange}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
 
         <div className="flex justify-end gap-4">
           <Button type="button" variant="outline" onClick={onCancel}>
@@ -250,4 +477,4 @@ export function CampaignForm({ initialData, onSubmit, onCancel }: CampaignFormPr
       </form>
     </Form>
   );
-} 
+}

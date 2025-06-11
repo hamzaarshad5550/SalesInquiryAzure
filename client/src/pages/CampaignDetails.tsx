@@ -14,14 +14,37 @@ import { CampaignMetrics } from '../components/campaigns/CampaignMetrics';
 interface Campaign {
   id: number;
   name: string;
-  description: string;
+  description?: string;
   start_date: string;
   end_date: string;
-  status: 'draft' | 'active' | 'completed' | 'cancelled';
-  budget: number;
-  owner_id: string;
+  status: 'draft' | 'active' | 'completed' | 'cancelled' | 'planning';
+  budget?: number;
+  owner_id: number;
   created_at: string;
   updated_at: string;
+  campaign_type?: string;
+  target_audience?: string[];
+  products?: string[];
+  locations?: string[];
+  marketing_channels?: string[];
+  success_metrics?: any;
+  media_assets?: any;
+  compliance_notes?: string;
+  approval_status?: 'pending' | 'approved' | 'rejected';
+  approved_by?: number;
+  approval_date?: string;
+  actual_spend?: number;
+  performance_metrics?: {
+    views?: number;
+    engagements?: number;
+    conversions?: number;
+  };
+  thumbnail_url?: string;
+  tags?: string[];
+  rich_description?: any;
+  audience_criteria?: any;
+  status_automation?: any;
+  last_status_update?: string;
 }
 
 export default function CampaignDetails() {
@@ -43,7 +66,7 @@ export default function CampaignDetails() {
         .single();
 
       if (error) throw error;
-      setCampaign(data);
+      setCampaign(data as Campaign);
     } catch (error) {
       console.error('Error fetching campaign:', error);
     } finally {
@@ -61,6 +84,17 @@ export default function CampaignDetails() {
         return 'bg-red-100 text-red-800';
       default:
         return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getApprovalStatusColor = (status?: string) => {
+    switch (status) {
+      case 'approved':
+        return 'bg-green-100 text-green-800';
+      case 'rejected':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-yellow-100 text-yellow-800';
     }
   };
 
@@ -95,47 +129,128 @@ export default function CampaignDetails() {
         <Badge className={getStatusColor(campaign.status)}>
           {campaign.status.charAt(0).toUpperCase() + campaign.status.slice(1)}
         </Badge>
+        {campaign.approval_status && (
+          <Badge className={getApprovalStatusColor(campaign.approval_status)}>
+            {campaign.approval_status.charAt(0).toUpperCase() + campaign.approval_status.slice(1)}
+          </Badge>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Duration</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-sm">
-              {format(new Date(campaign.start_date), 'MMM d, yyyy')} -{' '}
-              {format(new Date(campaign.end_date), 'MMM d, yyyy')}
-            </div>
-          </CardContent>
-        </Card>
+      {campaign.thumbnail_url && (
+        <div className="w-full h-64 bg-gray-200 rounded-md overflow-hidden flex items-center justify-center">
+          <img src={campaign.thumbnail_url} alt={campaign.name} className="h-full w-full object-cover" />
+        </div>
+      )}
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Budget</CardTitle>
-            <BarChart2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              ${campaign.budget.toLocaleString()}
+      <Card>
+        <CardHeader>
+          <CardTitle>Details</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <p className="text-sm font-medium">Description:</p>
+            <p>{campaign.description}</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm font-medium">Campaign Type:</p>
+              <p>{campaign.campaign_type || 'N/A'}</p>
             </div>
-          </CardContent>
-        </Card>
+            <div>
+              <p className="text-sm font-medium">Status:</p>
+              <p>{campaign.status}</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium">Start Date:</p>
+              <p>{format(new Date(campaign.start_date), 'MMM d, yyyy')}</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium">End Date:</p>
+              <p>{format(new Date(campaign.end_date), 'MMM d, yyyy')}</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium">Budget:</p>
+              <p>${campaign.budget?.toLocaleString() || '0'}</p>
+            </div>
+             <div>
+              <p className="text-sm font-medium">Actual Spend:</p>
+              <p>${campaign.actual_spend?.toLocaleString() || '0'}</p>
+            </div>
+             <div>
+              <p className="text-sm font-medium">Tags:</p>
+              <p>{campaign.tags?.join(', ') || 'N/A'}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Targets</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">0</div>
-            <p className="text-xs text-muted-foreground">
-              Total campaign targets
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Targeting & Content</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+           <div>
+              <p className="text-sm font-medium">Target Audience:</p>
+              <p>{campaign.target_audience?.join(', ') || 'N/A'}</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium">Associated Products:</p>
+              <p>{campaign.products?.join(', ') || 'N/A'}</p>
+            </div>
+             <div>
+              <p className="text-sm font-medium">Target Locations:</p>
+              <p>{campaign.locations?.join(', ') || 'N/A'}</p>
+            </div>
+             <div>
+              <p className="text-sm font-medium">Marketing Channels:</p>
+              <p>{campaign.marketing_channels?.join(', ') || 'N/A'}</p>
+            </div>
+             <div>
+              <p className="text-sm font-medium">Media Assets:</p>
+              <p>{campaign.media_assets ? JSON.stringify(campaign.media_assets) : 'N/A'}</p>
+            </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Approval & Compliance</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+           <div>
+              <p className="text-sm font-medium">Approval Status:</p>
+              <p>{campaign.approval_status || 'Pending'}</p>
+            </div>
+             <div>
+              <p className="text-sm font-medium">Approved By:</p>
+              <p>{campaign.approved_by ? campaign.approved_by.toLocaleString() : 'N/A'}</p>
+            </div>
+             <div>
+              <p className="text-sm font-medium">Approval Date:</p>
+              <p>{campaign.approval_date ? format(new Date(campaign.approval_date), 'MMM d, yyyy') : 'N/A'}</p>
+            </div>
+             <div>
+              <p className="text-sm font-medium">Compliance Notes:</p>
+              <p>{campaign.compliance_notes || 'N/A'}</p>
+            </div>
+        </CardContent>
+      </Card>
+
+       <Card>
+        <CardHeader>
+          <CardTitle>Performance</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+           <div>
+              <p className="text-sm font-medium">Success Metrics:</p>
+              <p>{campaign.success_metrics ? JSON.stringify(campaign.success_metrics) : 'N/A'}</p>
+            </div>
+             <div>
+              <p className="text-sm font-medium">Performance Metrics Preview:</p>
+              <p>{campaign.performance_metrics ? JSON.stringify(campaign.performance_metrics) : 'N/A'}</p>
+            </div>
+        </CardContent>
+      </Card>
 
       <Tabs defaultValue="targets" className="space-y-4">
         <TabsList>

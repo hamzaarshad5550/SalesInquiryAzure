@@ -147,6 +147,29 @@ CREATE TABLE IF NOT EXISTS dashboard_metrics (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Create campaign_history table
+CREATE TABLE IF NOT EXISTS campaign_history (
+    id SERIAL PRIMARY KEY,
+    campaign_id INTEGER NOT NULL,
+    action TEXT NOT NULL,
+    message TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT fk_campaign FOREIGN KEY (campaign_id) REFERENCES campaigns(id)
+);
+
+-- Create notifications table
+CREATE TABLE IF NOT EXISTS notifications (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    type TEXT NOT NULL,
+    reference_id INTEGER,
+    read BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
 -- Insert default pipeline stages
 INSERT INTO pipeline_stages (name, color, "order")
 SELECT 'Lead', 'blue', 1

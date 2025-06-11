@@ -10,6 +10,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
+  DialogDescription
 } from '../ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import {
@@ -21,6 +23,16 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../ui/table";
+import { format } from 'date-fns';
+import { useToast } from "@/hooks/use-toast";
 
 interface CampaignMetric {
   id: number;
@@ -38,10 +50,14 @@ export function CampaignMetrics({ campaignId }: CampaignMetricsProps) {
   const [metrics, setMetrics] = useState<CampaignMetric[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [selectedMetric, setSelectedMetric] = useState<CampaignMetric | null>(null);
   const [newMetric, setNewMetric] = useState({
     metric_type: '',
     value: '',
   });
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchMetrics();
@@ -59,6 +75,11 @@ export function CampaignMetrics({ campaignId }: CampaignMetricsProps) {
       setMetrics(data || []);
     } catch (error) {
       console.error('Error fetching metrics:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch metrics.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -82,9 +103,75 @@ export function CampaignMetrics({ campaignId }: CampaignMetricsProps) {
         metric_type: '',
         value: '',
       });
+      toast({
+        title: "Metric added",
+        description: "The metric has been added successfully.",
+      });
       fetchMetrics();
     } catch (error) {
       console.error('Error adding metric:', error);
+       toast({
+        title: "Error",
+        description: "Failed to add metric.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleUpdateMetric = async () => {
+     if (!selectedMetric) return;
+     try {
+       const { error } = await supabase
+         .from('campaign_metrics')
+         .update({
+           metric_type: selectedMetric.metric_type,
+           value: selectedMetric.value,
+         })
+         .eq('id', selectedMetric.id);
+
+       if (error) throw error;
+
+       setIsEditDialogOpen(false);
+       setSelectedMetric(null);
+        toast({
+        title: "Metric updated",
+        description: "The metric has been updated successfully.",
+      });
+       fetchMetrics();
+     } catch (error) {
+       console.error('Error updating metric:', error);
+        toast({
+        title: "Error",
+        description: "Failed to update metric.",
+        variant: "destructive",
+      });
+     }
+   };
+
+  const handleDeleteMetric = async () => {
+    if (!selectedMetric) return;
+    try {
+      const { error } = await supabase
+        .from('campaign_metrics')
+        .delete()
+        .eq('id', selectedMetric.id);
+
+      if (error) throw error;
+
+      setIsDeleteDialogOpen(false);
+      setSelectedMetric(null);
+       toast({
+        title: "Metric deleted",
+        description: "The metric has been deleted successfully.",
+      });
+      fetchMetrics();
+    } catch (error) {
+      console.error('Error deleting metric:', error);
+       toast({
+        title: "Error",
+        description: "Failed to delete metric.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -119,12 +206,12 @@ export function CampaignMetrics({ campaignId }: CampaignMetricsProps) {
   };
 
   const getMetricLabel = (metricType: string) => {
-    const labels: { [key: string]: string } = {
-      leads: 'Leads Generated',
-      conversions: 'Conversions',
-      revenue: 'Revenue ($)',
-      engagement: 'Engagement Rate (%)',
-    };
+    const labels: { [key: string]: string } = (
+      { leads: 'Leads Generated',
+        conversions: 'Conversions',
+        revenue: 'Revenue ($)',
+        engagement: 'Engagement Rate (%)',}
+    );
     return labels[metricType] || metricType;
   };
 
@@ -154,7 +241,8 @@ export function CampaignMetrics({ campaignId }: CampaignMetricsProps) {
         ))}
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex justify-between items-center">
+         <h2 className="text-xl font-semibold">All Recorded Metrics</h2>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
             <Button className="flex items-center gap-2">
@@ -206,6 +294,102 @@ export function CampaignMetrics({ campaignId }: CampaignMetricsProps) {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Table to display all recorded metrics */}
+       <Card className="p-4">
+         <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Metric Type</TableHead>
+              <TableHead>Value</TableHead>
+              <TableHead>Recorded At</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {metrics.map((metric) => (
+              <TableRow key={metric.id}>
+                <TableCell>{getMetricLabel(metric.metric_type)}</TableCell>
+                 <TableCell>
+                  {metric.metric_type === 'revenue'
+                    ? `$${metric.value.toLocaleString()}`
+                    : metric.metric_type === 'engagement'
+                    ? `${metric.value}%`
+                    : metric.value}
+                </TableCell>
+                <TableCell>{format(new Date(metric.recorded_at), 'MMM d, yyyy HH:mm')}</TableCell>
+                <TableCell className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => { setSelectedMetric(metric); setIsEditDialogOpen(true); }}>Edit</Button>
+                  <Button variant="destructive" size="sm" onClick={() => { setSelectedMetric(metric); setIsDeleteDialogOpen(true); }}>Delete</Button>
+                </TableCell>
+              </TableRow>
+            ))}
+             {!loading && metrics.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={4} className="text-center">No metrics recorded yet.</TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+       </Card>
+
+       {/* Edit Metric Dialog */}
+       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+         <DialogContent>
+           <DialogHeader>
+             <DialogTitle>Edit Campaign Metric</DialogTitle>
+           </DialogHeader>
+           {selectedMetric && (
+             <div className="space-y-4 py-4">
+                <Select
+                  value={selectedMetric.metric_type}
+                  onValueChange={(value) =>
+                    setSelectedMetric({ ...selectedMetric, metric_type: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select metric type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="leads">Leads Generated</SelectItem>
+                    <SelectItem value="conversions">Conversions</SelectItem>
+                    <SelectItem value="revenue">Revenue</SelectItem>
+                    <SelectItem value="engagement">Engagement Rate</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Input
+                  type="number"
+                  placeholder="Enter value"
+                  value={selectedMetric.value}
+                  onChange={(e) =>
+                     setSelectedMetric({ ...selectedMetric, value: parseFloat(e.target.value) || 0 })
+                  }
+                />
+               <div className="flex justify-end gap-4">
+                 <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
+                 <Button onClick={handleUpdateMetric}>Save Changes</Button>
+               </div>
+             </div>
+           )}
+         </DialogContent>
+       </Dialog>
+
+       {/* Delete Metric Dialog */}
+       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+         <DialogContent>
+           <DialogHeader>
+             <DialogTitle>Delete Metric</DialogTitle>
+             <DialogDescription>
+               Are you sure you want to delete this metric?
+             </DialogDescription>
+           </DialogHeader>
+           <DialogFooter>
+             <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Cancel</Button>
+             <Button variant="destructive" onClick={handleDeleteMetric}>Delete</Button>
+           </DialogFooter>
+         </DialogContent>
+       </Dialog>
 
       <Card className="p-6">
         <div className="h-[400px]">

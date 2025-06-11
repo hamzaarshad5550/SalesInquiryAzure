@@ -233,6 +233,13 @@ export const campaigns = pgTable("campaigns", {
   ownerId: integer("owner_id").references(() => users.id).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  imageUrl: text("image_url"),
+  tags: text("tags"),
+  target_audience: text("target_audience"),
+  associated_products: text("associated_products"),
+  views: integer("views").default(0).notNull(),
+  engagements: integer("engagements").default(0).notNull(),
+  conversions: integer("conversions").default(0).notNull(),
 });
 
 export const insertCampaignSchema = createInsertSchema(campaigns);
