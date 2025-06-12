@@ -20,8 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { fetchCampaigns, createCampaign, updateCampaign, deleteCampaign } from "@/lib/supabase";
-import { CampaignForm } from "@/components/campaigns/CampaignForm";
-import { CampaignFormSchema } from "@/components/campaigns/CampaignForm";
+import { CampaignForm, CampaignFormOutput } from "@/components/campaigns/CampaignForm";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -42,8 +41,6 @@ interface Campaign {
   products?: string[];
   locations?: string[];
   marketing_channels?: string[];
-  success_metrics?: any;
-  media_assets?: any;
   compliance_notes?: string;
   approval_status?: 'pending' | 'approved' | 'rejected';
   approved_by?: number;
@@ -119,9 +116,9 @@ export default function Campaigns() {
   */
 
   // Handle create campaign
-  const handleCreateCampaign = async (formData: CampaignFormSchema) => {
+  const handleCreateCampaign = async (formData: CampaignFormOutput) => {
     try {
-      const campaignData: Campaign = {
+      const campaignData = {
         id: 0, // Temporary ID, will be ignored by supabase for new inserts
         name: formData.name,
         description: formData.description,
@@ -133,25 +130,22 @@ export default function Campaigns() {
         createdAt: new Date().toISOString(), // Assuming creation date is handled here
         updatedAt: new Date().toISOString(), // Assuming update date is handled here
         campaign_type: formData.campaign_type,
-        approval_status: formData.approval_status,
         approved_by: formData.approved_by,
-        approval_date: formData.approval_date?.toISOString() || null, // Ensure string or null for supabase
+        approval_date: formData.approval_date?.toISOString() || null,
         compliance_notes: formData.compliance_notes,
         target_audience: formData.target_audience,
         products: formData.products,
         locations: formData.locations,
         marketing_channels: formData.marketing_channels,
-        success_metrics: formData.success_metrics,
-        media_assets: formData.media_assets,
         actual_spend: formData.actual_spend,
-        performance_metrics: formData.performance_metrics,
         thumbnail_url: formData.thumbnail_url,
         tags: formData.tags,
         rich_description: formData.rich_description,
-        audience_criteria: formData.audience_criteria,
-        status_automation: formData.status_automation,
-        last_status_update: formData.last_status_update?.toISOString() || null // Ensure string or null
+        last_status_update: formData.last_status_update?.toISOString() || null
       };
+
+      console.log("[DEBUG] Campaign data being sent to createCampaign:", campaignData);
+
       await createCampaign(campaignData);
       setIsCreateDialogOpen(false);
       toast({
@@ -170,10 +164,12 @@ export default function Campaigns() {
   };
 
   // Handle edit campaign
-  const handleEditCampaign = async (formData: CampaignFormSchema) => {
+  const handleEditCampaign = async (formData: CampaignFormOutput) => {
     if (!selectedCampaign) return;
     try {
-      const campaignData: Campaign = {
+      console.log("[DEBUG] Form data received for edit:", formData);
+      
+      const campaignData = {
         id: selectedCampaign.id, // Use existing ID for update
         name: formData.name,
         description: formData.description,
@@ -181,11 +177,10 @@ export default function Campaigns() {
         startDate: formData.start_date.toISOString(),
         endDate: formData.end_date.toISOString(),
         budget: formData.budget,
-        ownerId: DEFAULT_USER_ID, // Use default user ID
+        ownerId: selectedCampaign.ownerId, // Preserve original owner
         createdAt: selectedCampaign.createdAt, // Preserve original creation date
         updatedAt: new Date().toISOString(), // Update timestamp on edit
         campaign_type: formData.campaign_type,
-        approval_status: formData.approval_status,
         approved_by: formData.approved_by,
         approval_date: formData.approval_date?.toISOString() || null,
         compliance_notes: formData.compliance_notes,
@@ -193,17 +188,15 @@ export default function Campaigns() {
         products: formData.products,
         locations: formData.locations,
         marketing_channels: formData.marketing_channels,
-        success_metrics: formData.success_metrics,
-        media_assets: formData.media_assets,
         actual_spend: formData.actual_spend,
-        performance_metrics: formData.performance_metrics,
         thumbnail_url: formData.thumbnail_url,
         tags: formData.tags,
         rich_description: formData.rich_description,
-        audience_criteria: formData.audience_criteria,
-        status_automation: formData.status_automation,
         last_status_update: formData.last_status_update?.toISOString() || null
       };
+
+      console.log("[DEBUG] Campaign data being sent to updateCampaign:", campaignData);
+
       await updateCampaign(selectedCampaign.id, campaignData);
       setIsEditDialogOpen(false);
       toast({

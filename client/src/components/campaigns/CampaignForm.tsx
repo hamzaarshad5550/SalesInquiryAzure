@@ -1,5 +1,5 @@
 // client/src/components/campaigns/CampaignForm.tsx
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -30,10 +30,16 @@ import {
 import { CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '../../lib/utils';
+import { uploadFile, getFileUrl } from '../../lib/supabase';
+import { FileUpload } from '../ui/file-upload';
+import { useToast } from "@/hooks/use-toast";
+
+// Utility function for delaying execution
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const campaignSchema = z.object({
   name: z.string().min(1, 'Campaign name is required'),
-  description: z.string().optional(),
+  description: z.string().optional().default(''),
   start_date: z.date({
     required_error: 'Start date is required',
   }),
@@ -41,30 +47,28 @@ const campaignSchema = z.object({
     required_error: 'End date is required',
   }),
   status: z.enum(['draft', 'pending', 'approved', 'rejected', 'active', 'completed', 'cancelled', 'planning']),
-  budget: z.coerce.number(),
-  campaign_type: z.string().optional(),
-  target_audience: z.string().optional().transform((val) => val ? val.split(',').map(s => s.trim()) : []),
-  products: z.string().optional().transform((val) => val ? val.split(',').map(s => s.trim()) : []),
-  locations: z.string().optional().transform((val) => val ? val.split(',').map(s => s.trim()) : []),
-  marketing_channels: z.string().optional().transform((val) => val ? val.split(',').map(s => s.trim()) : []),
-  success_metrics: z.any().optional(),
-  media_assets: z.any().optional(),
-  compliance_notes: z.string().optional(),
-  approved_by: z.string().optional().transform((val) => val ? parseInt(val, 10) : undefined),
+  budget: z.string().transform((val) => val ? parseFloat(val) || 0 : 0),
+  campaign_type: z.string().optional().default(''),
+  target_audience: z.string().optional().default('').transform((val) => val ? val.split(',').map(s => s.trim()) : []),
+  products: z.string().optional().default('').transform((val) => val ? val.split(',').map(s => s.trim()) : []),
+  locations: z.string().optional().default('').transform((val) => val ? val.split(',').map(s => s.trim()) : []),
+  marketing_channels: z.string().optional().default('').transform((val) => val ? val.split(',').map(s => s.trim()) : []),
+  compliance_notes: z.string().optional().default(''),
+  approved_by: z.string().optional().default('').transform((val) => val ? parseInt(val, 10) : undefined),
   approval_date: z.date().optional().nullable(),
-  actual_spend: z.coerce.number().optional(),
-  thumbnail_url: z.string().url("Invalid URL").optional().or(z.literal("")).transform((val) => {
-    if (val && val.includes("drive.google.com/uc?export=view&id=")) {
-      const urlParams = new URLSearchParams(val.split('?')[1]);
-      const id = urlParams.get('id');
-      if (id) {
-        return `https://drive.google.com/uc?export=download&id=${id}`;
-      }
-    }
-    return val;
-  }),
-  tags: z.string().optional().transform((val) => val ? val.split(',').map(s => s.trim()) : []),
-  rich_description: z.string().optional(),
+  actual_spend: z.string().optional().default('').transform((val) => val ? parseFloat(val) || 0 : 0),
+  thumbnail_url: z.union([
+    z.string().url("Invalid URL").optional().or(z.literal("")),
+    z.instanceof(File).refine(
+      (file) => file.size <= 5 * 1024 * 1024,
+      "File size must be less than 5MB"
+    ).refine(
+      (file) => ['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(file.type),
+      "File must be an image (JPEG, PNG, GIF, or WebP)"
+    )
+  ]).optional().default(''),
+  tags: z.string().optional().default('').transform((val) => val ? val.split(',').map(s => s.trim()) : []),
+  rich_description: z.string().optional().default(''),
   last_status_update: z.date().optional().nullable(),
 });
 
@@ -85,8 +89,6 @@ interface CampaignFormProps {
     products?: string[];
     locations?: string[];
     marketing_channels?: string[];
-    success_metrics?: any;
-    media_assets?: any;
     compliance_notes?: string;
     approved_by?: number;
     approval_date?: string | null;
@@ -101,6 +103,16 @@ interface CampaignFormProps {
 }
 
 export function CampaignForm({ initialData, onSubmit, onCancel }: CampaignFormProps) {
+  const { toast } = useToast();
+  const [isUploading, setIsUploading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(() => {
+    // Initialize preview URL from initialData if available
+    if (initialData?.thumbnail_url) {
+      return initialData.thumbnail_url.replace(/^@/, '');
+    }
+    return null;
+  });
+
   const defaultValues: CampaignFormInput = {
     name: initialData?.name || '',
     description: initialData?.description || '',
@@ -109,31 +121,158 @@ export function CampaignForm({ initialData, onSubmit, onCancel }: CampaignFormPr
     status: (initialData?.status || 'draft') as 'draft' | 'pending' | 'approved' | 'rejected' | 'active' | 'completed' | 'cancelled' | 'planning',
     budget: initialData?.budget?.toString() || '0',
     campaign_type: initialData?.campaign_type || '',
-    target_audience: initialData?.target_audience?.join(', ') || '',
-    products: initialData?.products?.join(', ') || '',
-    locations: initialData?.locations?.join(', ') || '',
-    marketing_channels: initialData?.marketing_channels?.join(', ') || '',
-    success_metrics: initialData?.success_metrics || undefined,
-    media_assets: initialData?.media_assets || undefined,
+    target_audience: Array.isArray(initialData?.target_audience) ? initialData.target_audience.join(', ') : '',
+    products: Array.isArray(initialData?.products) ? initialData.products.join(', ') : '',
+    locations: Array.isArray(initialData?.locations) ? initialData.locations.join(', ') : '',
+    marketing_channels: Array.isArray(initialData?.marketing_channels) ? initialData.marketing_channels.join(', ') : '',
     compliance_notes: initialData?.compliance_notes || '',
     approved_by: initialData?.approved_by?.toString() || '',
     approval_date: initialData?.approval_date ? new Date(initialData.approval_date) : null,
     actual_spend: initialData?.actual_spend?.toString() || '0',
-    thumbnail_url: initialData?.thumbnail_url || '',
-    tags: initialData?.tags?.join(', ') || '',
+    thumbnail_url: (() => {
+      const url = initialData?.thumbnail_url;
+      if (typeof url === 'string' && url) {
+        // Remove any leading '@' symbol if present
+        const cleanedUrl = url.startsWith('@') ? url.substring(1) : url;
+        
+        // Handle Google Drive URL conversion
+        if (cleanedUrl.includes("drive.google.com")) {
+          try {
+            const parsedUrl = new URL(cleanedUrl);
+            if (parsedUrl.hostname === 'drive.google.com' && parsedUrl.searchParams.has('id')) {
+              const id = parsedUrl.searchParams.get('id');
+              return `https://drive.google.com/uc?export=download&id=${id}`;
+            }
+          } catch (e) {
+            console.warn("Invalid Google Drive URL in initialData:", cleanedUrl, e);
+          }
+        }
+        return cleanedUrl; // Return the cleaned URL (could be Supabase or other valid URL)
+      }
+      return ''; // Default to empty string if no URL or not a string
+    })(),
+    tags: Array.isArray(initialData?.tags) ? initialData.tags.join(', ') : '',
     rich_description: initialData?.rich_description || '',
     last_status_update: initialData?.last_status_update ? new Date(initialData.last_status_update) : null,
   };
 
   const form = useForm<CampaignFormInput>({
     resolver: zodResolver(campaignSchema),
-    defaultValues: defaultValues,
+    defaultValues,
   });
+
+  // Handle immediate image preview
+  const handleImagePreview = useCallback((file: File) => {
+    const objectUrl = URL.createObjectURL(file);
+    setPreviewUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, []);
+
+  // Handle image upload
+  const handleImageUpload = useCallback(async (file: File): Promise<string> => {
+    try {
+      setIsUploading(true);
+      
+      // Generate a unique filename with timestamp and random string
+      const timestamp = new Date().getTime();
+      const randomString = Math.random().toString(36).substring(2, 15);
+      const fileExtension = file.name.split('.').pop();
+      const filePath = `${timestamp}_${randomString}.${fileExtension}`;
+
+      // Store the generated filePath for logging
+      console.log("[DEBUG] Generated filePath:", filePath);
+
+      // Upload the file
+      const uploadResult = await uploadFile('campaign-thumbnails', filePath, file);
+      
+      if (!uploadResult) {
+        throw new Error('Upload failed');
+      }
+
+      // Get the public URL immediately and clean it up
+      const publicUrl = await getFileUrl('campaign-thumbnails', filePath);
+      
+      if (!publicUrl) {
+        throw new Error('Failed to get public URL');
+      }
+
+      // Verify the URL contains our generated filename
+      if (!publicUrl.includes(filePath)) {
+        console.error("[ERROR] URL mismatch - Generated:", filePath, "URL contains:", publicUrl);
+        throw new Error('URL verification failed - filename mismatch');
+      }
+
+      // Clean up the URL by removing any double slashes and ensuring consistent format
+      const cleanedUrl = publicUrl.replace(/([^:]\/)\/+/g, '$1');
+
+      // Log the final URL for debugging
+      console.log("[DEBUG] Final cleaned URL:", cleanedUrl);
+
+      toast({
+        title: "Image uploaded successfully",
+        description: "The campaign thumbnail has been uploaded.",
+      });
+
+      return cleanedUrl;
+    } catch (error) {
+      console.error("[ERROR] Image upload failed:", error);
+      toast({
+        title: "Upload failed",
+        description: "Failed to upload the image. Please try again.",
+        variant: "destructive",
+      });
+      throw error;
+    } finally {
+      setIsUploading(false);
+    }
+  }, [toast]);
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit((data) => {
-        onSubmit(data as CampaignFormOutput);
+      <form onSubmit={form.handleSubmit(async (data) => {
+        try {
+          let finalThumbnailUrl = '';
+
+          // Handle file upload if a new file is selected
+          if (data.thumbnail_url instanceof File) {
+            // Store the original file for logging
+            console.log("[DEBUG] Uploading file:", data.thumbnail_url.name);
+            finalThumbnailUrl = await handleImageUpload(data.thumbnail_url);
+            // Log the final URL that will be stored in the database
+            console.log("[DEBUG] URL to be stored in database:", finalThumbnailUrl);
+          } else if (typeof data.thumbnail_url === 'string' && data.thumbnail_url) {
+            // Clean up existing URL by removing any double slashes and @ symbol
+            finalThumbnailUrl = data.thumbnail_url
+              .replace(/^@/, '')
+              .replace(/([^:]\/)\/+/g, '$1');
+          }
+
+          const dataToSubmit: CampaignFormOutput = {
+            ...data,
+            thumbnail_url: finalThumbnailUrl,
+            description: data.description || '',
+            campaign_type: data.campaign_type || '',
+            budget: typeof data.budget === 'string' ? parseFloat(data.budget) || 0 : data.budget || 0,
+            target_audience: typeof data.target_audience === 'string' ? data.target_audience.split(',').map(s => s.trim()) : [],
+            products: typeof data.products === 'string' ? data.products.split(',').map(s => s.trim()) : [],
+            locations: typeof data.locations === 'string' ? data.locations.split(',').map(s => s.trim()) : [],
+            marketing_channels: typeof data.marketing_channels === 'string' ? data.marketing_channels.split(',').map(s => s.trim()) : [],
+            compliance_notes: data.compliance_notes || '',
+            approved_by: typeof data.approved_by === 'string' ? parseInt(data.approved_by, 10) || undefined : data.approved_by,
+            actual_spend: typeof data.actual_spend === 'string' ? parseFloat(data.actual_spend) || 0 : data.actual_spend || 0,
+            tags: typeof data.tags === 'string' ? data.tags.split(',').map(s => s.trim()) : [],
+            rich_description: data.rich_description || '',
+          };
+
+          onSubmit(dataToSubmit);
+        } catch (error) {
+          console.error("[ERROR] Form submission failed:", error);
+          toast({
+            title: "Error",
+            description: "Failed to submit the form. Please try again.",
+            variant: "destructive",
+          });
+        }
       })} className="space-y-4">
         <FormField
           control={form.control}
@@ -154,9 +293,50 @@ export function CampaignForm({ initialData, onSubmit, onCancel }: CampaignFormPr
           name="thumbnail_url"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Campaign Thumbnail / Image URL</FormLabel>
+              <FormLabel>Campaign Thumbnail</FormLabel>
               <FormControl>
-                <Input placeholder="Enter image URL" {...field} />
+                <div className="space-y-4">
+                  <FileUpload
+                    value={field.value}
+                    onChange={async (file) => {
+                      if (file instanceof File) {
+                        // Show immediate preview
+                        handleImagePreview(file);
+                      }
+                      field.onChange(file);
+                    }}
+                    onError={(error) => {
+                      console.error("[ERROR] File upload error:", error);
+                      form.setError('thumbnail_url', { message: error });
+                      toast({
+                        title: "Upload error",
+                        description: error,
+                        variant: "destructive",
+                      });
+                    }}
+                    className="w-full"
+                    aspectRatio={16/9}
+                    minWidth={800}
+                    minHeight={450}
+                    maxWidth={3840}
+                    maxHeight={2160}
+                    disabled={isUploading}
+                  />
+                  {isUploading && (
+                    <div className="text-sm text-muted-foreground">
+                      Uploading image...
+                    </div>
+                  )}
+                  {previewUrl && (
+                    <div className="mt-2">
+                      <img
+                        src={previewUrl}
+                        alt="Preview"
+                        className="max-h-48 rounded-md object-cover"
+                      />
+                    </div>
+                  )}
+                </div>
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -310,8 +490,11 @@ export function CampaignForm({ initialData, onSubmit, onCancel }: CampaignFormPr
                     type="text"
                     placeholder="Enter campaign budget"
                     {...field}
-                    value={field.value?.toString() || ''}
-                    onChange={field.onChange}
+                    value={field.value || '0'}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9.]/g, '');
+                      field.onChange(value);
+                    }}
                   />
                 </FormControl>
                 <FormMessage />
@@ -358,8 +541,11 @@ export function CampaignForm({ initialData, onSubmit, onCancel }: CampaignFormPr
                   <Input
                     placeholder="e.g., Health, Wellness, Prescription"
                     {...field}
-                    value={Array.isArray(field.value) ? field.value.join(', ') : field.value || ''}
-                    onChange={e => field.onChange(e.target.value)}
+                    value={field.value || ''}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^a-zA-Z0-9, ]/g, '');
+                      field.onChange(value);
+                    }}
                   />
                 </FormControl>
                 <FormMessage />
@@ -379,8 +565,7 @@ export function CampaignForm({ initialData, onSubmit, onCancel }: CampaignFormPr
                   <Input
                     placeholder="e.g., Seniors, Children, Diabetics"
                     {...field}
-                    value={Array.isArray(field.value) ? field.value.join(', ') : field.value || ''}
-                    onChange={e => field.onChange(e.target.value)}
+                    value={field.value || ''}
                   />
                 </FormControl>
                 <FormMessage />
@@ -398,8 +583,7 @@ export function CampaignForm({ initialData, onSubmit, onCancel }: CampaignFormPr
                   <Input
                     placeholder="e.g., Vitamin D, Zinc, Cold Relief Kits"
                     {...field}
-                    value={Array.isArray(field.value) ? field.value.join(', ') : field.value || ''}
-                    onChange={e => field.onChange(e.target.value)}
+                    value={field.value || ''}
                   />
                 </FormControl>
                 <FormMessage />
@@ -432,10 +616,13 @@ export function CampaignForm({ initialData, onSubmit, onCancel }: CampaignFormPr
                 <FormControl>
                   <Input
                     type="text"
-                    placeholder="Enter approver user ID"
+                    placeholder="Enter approver ID"
                     {...field}
-                    value={field.value?.toString() || ''}
-                    onChange={field.onChange}
+                    value={field.value || ''}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9]/g, '');
+                      field.onChange(value);
+                    }}
                   />
                 </FormControl>
                 <FormMessage />
@@ -456,8 +643,11 @@ export function CampaignForm({ initialData, onSubmit, onCancel }: CampaignFormPr
                     type="text"
                     placeholder="Enter actual spend"
                     {...field}
-                    value={field.value?.toString() || ''}
-                    onChange={field.onChange}
+                    value={field.value || '0'}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9.]/g, '');
+                      field.onChange(value);
+                    }}
                   />
                 </FormControl>
                 <FormMessage />

@@ -27,8 +27,6 @@ interface Campaign {
   products?: string[];
   locations?: string[];
   marketing_channels?: string[];
-  success_metrics?: any;
-  media_assets?: any;
   compliance_notes?: string;
   approval_status?: 'pending' | 'approved' | 'rejected';
   approved_by?: number;
@@ -205,10 +203,6 @@ export default function CampaignDetails() {
               <p className="text-sm font-medium">Marketing Channels:</p>
               <p>{campaign.marketing_channels?.join(', ') || 'N/A'}</p>
             </div>
-             <div>
-              <p className="text-sm font-medium">Media Assets:</p>
-              <p>{campaign.media_assets ? JSON.stringify(campaign.media_assets) : 'N/A'}</p>
-            </div>
         </CardContent>
       </Card>
 
@@ -242,10 +236,6 @@ export default function CampaignDetails() {
         </CardHeader>
         <CardContent className="space-y-4">
            <div>
-              <p className="text-sm font-medium">Success Metrics:</p>
-              <p>{campaign.success_metrics ? JSON.stringify(campaign.success_metrics) : 'N/A'}</p>
-            </div>
-             <div>
               <p className="text-sm font-medium">Performance Metrics Preview:</p>
               <p>{campaign.performance_metrics ? JSON.stringify(campaign.performance_metrics) : 'N/A'}</p>
             </div>

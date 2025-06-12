@@ -111,16 +111,108 @@ export async function deleteData(table: string, id: number) {
 }
 
 // File storage functions
-export async function uploadFile(bucket: string, path: string, file: File) {
-  const { data, error } = await supabase.storage
-    .from(bucket)
-    .upload(path, file, {
-      cacheControl: '3600',
-      upsert: false
+async function listAvailableBuckets() {
+  try {
+    console.log("[DEBUG] Attempting to list buckets...");
+    const { data: buckets, error } = await supabase
+      .storage
+      .listBuckets();
+    
+    if (error) {
+      console.error("[DEBUG] Error listing buckets:", {
+        message: error.message,
+        name: error.name,
+      });
+      return [];
+    }
+    
+    console.log("[DEBUG] Buckets found:", buckets.map(b => ({
+      id: b.id,
+      name: b.name,
+      public: b.public,
+      created_at: b.created_at,
+      owner: b.owner
+    })));
+    
+    return buckets;
+  } catch (error: any) {
+    console.error("[DEBUG] Unexpected error listing buckets:", {
+      message: error?.message || 'Unknown error',
+      name: error?.name || 'Error',
+      stack: error?.stack || 'No stack trace'
     });
-  
-  if (error) throw error;
-  return data;
+    return [];
+  }
+}
+
+export async function uploadFile(bucket: string, path: string, file: File) {
+  try {
+    console.log(`[DEBUG] Starting upload process for bucket: ${bucket}`);
+    console.log(`[DEBUG] File details:`, {
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      lastModified: file.lastModified
+    });
+
+    // First verify the bucket exists and is accessible
+    console.log("[DEBUG] Verifying bucket access...");
+    const { data: bucketData, error: bucketError } = await supabase
+      .storage
+      .from(bucket)
+      .list();
+
+    if (bucketError) {
+      console.error("[DEBUG] Error accessing bucket:", {
+        message: bucketError.message,
+        name: bucketError.name,
+        error: bucketError
+      });
+      throw new Error(`Cannot access bucket: ${bucketError.message}`);
+    }
+
+    console.log("[DEBUG] Bucket access verified, current contents:", bucketData);
+    console.log(`[DEBUG] Using provided path: ${path}`);
+
+    // Upload the file using the provided path
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .upload(path, file, {
+        cacheControl: '3600',
+        upsert: true
+      });
+    
+    if (error) {
+      console.error("[DEBUG] Upload error details:", {
+        message: error.message,
+        name: error.name,
+        error: error
+      });
+      throw error;
+    }
+
+    console.log("[DEBUG] Upload successful:", data);
+
+    // Get the public URL using the same path
+    const { data: { publicUrl } } = supabase.storage
+      .from(bucket)
+      .getPublicUrl(path);
+
+    console.log("[DEBUG] File public URL:", publicUrl);
+
+    return {
+      ...data,
+      publicUrl
+    };
+  } catch (error: any) {
+    console.error("[DEBUG] Error in uploadFile:", {
+      message: error?.message || 'Unknown error',
+      name: error?.name || 'Error',
+      stack: error?.stack || 'No stack trace',
+      error: error
+    });
+    throw error;
+  }
 }
 
 export async function getFileUrl(bucket: string, path: string) {
@@ -252,7 +344,9 @@ export async function fetchCampaigns(filters = {}) {
   console.log("[DEBUG] Number of campaigns fetched:", data?.length || 0);
 
   // Transform the data to match the frontend interface
-  const transformedData = data?.map(campaign => ({
+  const transformedData = data?.map(campaign => {
+    console.log("[DEBUG] fetchCampaigns - Raw thumbnail_url from DB:", campaign.thumbnail_url);
+    return {
     id: campaign.id,
     name: campaign.name,
     description: campaign.description,
@@ -268,8 +362,6 @@ export async function fetchCampaigns(filters = {}) {
     products: campaign.products,
     locations: campaign.locations,
     marketing_channels: campaign.marketing_channels,
-    success_metrics: campaign.success_metrics,
-    media_assets: campaign.media_assets,
     compliance_notes: campaign.compliance_notes,
     approval_status: campaign.approval_status,
     approved_by: campaign.approved_by,
@@ -282,7 +374,7 @@ export async function fetchCampaigns(filters = {}) {
     audience_criteria: campaign.audience_criteria,
     status_automation: campaign.status_automation,
     last_status_update: campaign.last_status_update,
-  })) || [];
+  }});
 
   console.log("[DEBUG] Transformed campaign data:", transformedData);
   return transformedData;
@@ -304,8 +396,6 @@ export async function createCampaign(campaignData: Record<string, any>) {
     products: campaignData.products,
     locations: campaignData.locations,
     marketing_channels: campaignData.marketing_channels,
-    success_metrics: campaignData.success_metrics,
-    media_assets: campaignData.media_assets,
     compliance_notes: campaignData.compliance_notes,
     approval_status: campaignData.approval_status,
     approved_by: campaignData.approved_by,
@@ -342,14 +432,56 @@ export async function createCampaign(campaignData: Record<string, any>) {
     budget: data.budget,
     ownerId: data.owner_id,
     createdAt: data.created_at,
-    updatedAt: data.updated_at
+    updatedAt: data.updated_at,
+    campaign_type: data.campaign_type,
+    target_audience: data.target_audience,
+    products: data.products,
+    locations: data.locations,
+    marketing_channels: data.marketing_channels,
+    compliance_notes: data.compliance_notes,
+    approval_status: data.approval_status,
+    approved_by: data.approved_by,
+    approval_date: data.approval_date,
+    actual_spend: data.actual_spend,
+    performance_metrics: data.performance_metrics,
+    thumbnail_url: data.thumbnail_url,
+    tags: data.tags,
+    rich_description: data.rich_description,
+    audience_criteria: data.audience_criteria,
+    status_automation: data.status_automation,
+    last_status_update: data.last_status_update,
   };
 }
 
 // Update a campaign
 export async function updateCampaign(campaignId: number, updates: Record<string, any>) {
+  // Define the type for database updates
+  type CampaignUpdate = {
+    name?: string;
+    description?: string;
+    status?: string;
+    start_date?: string;
+    end_date?: string;
+    budget?: number;
+    campaign_type?: string;
+    target_audience?: string[];
+    products?: string[];
+    locations?: string[];
+    marketing_channels?: string[];
+    compliance_notes?: string;
+    approval_status?: string;
+    approved_by?: number;
+    approval_date?: string | null;
+    actual_spend?: number;
+    thumbnail_url?: string;
+    tags?: string[];
+    rich_description?: string;
+    last_status_update?: string | null;
+    updated_at: string;
+  };
+
   // Transform the data to match the database schema
-  const dbUpdates = {
+  const dbUpdates: CampaignUpdate = {
     name: updates.name,
     description: updates.description,
     status: updates.status,
@@ -361,21 +493,26 @@ export async function updateCampaign(campaignId: number, updates: Record<string,
     products: updates.products,
     locations: updates.locations,
     marketing_channels: updates.marketing_channels,
-    success_metrics: updates.success_metrics,
-    media_assets: updates.media_assets,
     compliance_notes: updates.compliance_notes,
     approval_status: updates.approval_status,
     approved_by: updates.approved_by,
     approval_date: updates.approval_date,
     actual_spend: updates.actual_spend,
-    performance_metrics: updates.performance_metrics,
     thumbnail_url: updates.thumbnail_url,
     tags: updates.tags,
     rich_description: updates.rich_description,
-    audience_criteria: updates.audience_criteria,
-    status_automation: updates.status_automation,
     last_status_update: updates.last_status_update,
+    updated_at: new Date().toISOString(), // Always update the updated_at timestamp
   };
+
+  // Remove any undefined or null values to prevent conflicts
+  Object.keys(dbUpdates).forEach(key => {
+    if (dbUpdates[key as keyof CampaignUpdate] === undefined || dbUpdates[key as keyof CampaignUpdate] === null) {
+      delete dbUpdates[key as keyof CampaignUpdate];
+    }
+  });
+
+  console.log("[DEBUG] Updating campaign with data:", dbUpdates);
 
   const { data, error } = await supabase
     .from('campaigns')
@@ -406,19 +543,14 @@ export async function updateCampaign(campaignId: number, updates: Record<string,
     products: data.products,
     locations: data.locations,
     marketing_channels: data.marketing_channels,
-    success_metrics: data.success_metrics,
-    media_assets: data.media_assets,
     compliance_notes: data.compliance_notes,
     approval_status: data.approval_status,
     approved_by: data.approved_by,
     approval_date: data.approval_date,
     actual_spend: data.actual_spend,
-    performance_metrics: data.performance_metrics,
     thumbnail_url: data.thumbnail_url,
     tags: data.tags,
     rich_description: data.rich_description,
-    audience_criteria: data.audience_criteria,
-    status_automation: data.status_automation,
     last_status_update: data.last_status_update,
   };
 }
